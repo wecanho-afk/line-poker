@@ -5,8 +5,13 @@ const path = require('path');
 const Hand = require('pokersolver').Hand;
 
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+    path: '/socket.io/', // 確保路徑與前端匹配
+    cors: {
+        origin: '*', // 允許所有來源連線，正式環境應限制為你的 Vercel 網址
+        methods: ['GET', 'POST']
+    }
+});
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -573,6 +578,3 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
