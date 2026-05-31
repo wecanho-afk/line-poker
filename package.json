@@ -1,14 +1,16 @@
 {
   "name": "line-poker",
   "version": "1.0.0",
-  "description": "LINE Texas Holdem Poker",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  },
+  "description": "Texas Hold'em backend for LINE LIFF",
+  "main": "app.js",
   "dependencies": {
-    "express": "^4.19.2",
+    "cors": "^2.8.6",
+    "express": "^4.22.2",
     "pokersolver": "^2.1.4",
-    "socket.io": "^4.7.5"
+    "socket.io": "^4.8.3",
+    "uuid": "^14.0.0"
+  },
+  "scripts": {
+    "start": "node app.js"
   }
 }

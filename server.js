@@ -5,6 +5,7 @@ const path = require('path');
 const Hand = require('pokersolver').Hand;
 
 const app = express();
+const server = http.createServer(app);
 const io = new Server(server, {
     path: '/socket.io/', // 確保路徑與前端匹配
     cors: {
@@ -28,10 +29,7 @@ let botCount = 0;
 let turnTimer = null;
 let turnInterval = null;
 let turnTimeLeft = 20;
-let currentHandCount = 0;
-let maxHands = 50;
 let lastHandWinnerIds = []; // 新增：記錄上一手贏家ID，用於前端顯示"win"
-let gameSessionScores = {}; // 新增：記錄50局遊戲的累計分數
 const HAND_END_DELAY_MS = 5000; // 新增：每手結束後的延遲時間 (毫秒)
 
 function handlePlayerAction(p, actionData) {
@@ -153,8 +151,6 @@ function broadcastState() {
         currentBet,
         stage,
         defaultChips,
-        currentHandCount,
-        maxHands,
         lastHandWinnerIds // 新增：發送上一手贏家ID到前端
     });
 }
@@ -348,26 +344,10 @@ function endHand() {
     // 新增：處理單局獲勝者的顯示
     lastHandWinnerIds = winnersList.map(w => w.id);
 
-    // 新增：更新累計分數
-    players.forEach(p => {
-        if (!gameSessionScores[p.id]) {
-            gameSessionScores[p.id] = 0;
-        }
-        // 計算單局籌碼變化，累加到會話總分
-        let initialChips = defaultChips; 
-        let playerHandScore = p.chips - initialChips; 
-        gameSessionScores[p.id] += playerHandScore;
-    });
+    broadcastState(); // 在更新完 lastHandWinnerIds 後廣播狀態
 
-    broadcastState(); // 在更新完 lastHandWinnerIds 和 gameSessionScores 後廣播狀態
-
-    // 新增：在延遲後自動開始新一局或結束整個遊戲會話
-    if (currentHandCount < maxHands) {
-        setTimeout(() => startNewRoundFlow(), HAND_END_DELAY_MS);
-    } else {
-        // 達到最大局數，結束整個遊戲會話
-        setTimeout(() => endGameSession(), HAND_END_DELAY_MS);
-    }
+    // 新增：在延遲後自動開始新一局
+    setTimeout(() => startNewRoundFlow(), HAND_END_DELAY_MS);
 }
 
 function startHand() {
@@ -462,26 +442,6 @@ function startNewRoundFlow() {
     startHand();
 }
 
-// 新增：處理遊戲會話結束，顯示最終分數
-function endGameSession() {
-    io.emit('system_message', `遊戲會話結束！共 ${maxHands} 局。最終累計成績:`);
-    // 廣播最終成績
-    let finalScoresMsg = Object.keys(gameSessionScores)
-        .map(playerId => {
-            let player = players.find(p => p.id === playerId);
-            return `${player ? player.displayName : '未知玩家'}: ${gameSessionScores[playerId]} 籌碼`;
-        })
-        .join(', ');
-    io.emit('system_message', finalScoresMsg);
-
-    // 重置所有遊戲會話相關的狀態
-    stage = 'waiting';
-    currentHandCount = 0;
-    gameSessionScores = {}; 
-    lastHandWinnerIds = []; // 重置贏家ID
-    broadcastState();
-}
-
 io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         let p = players.find(player => player.id === socket.id);
@@ -508,12 +468,13 @@ io.on('connection', (socket) => {
             if (isGameRunning) {
                 io.emit('system_message', `${data.displayName} 進入牌桌，將於下一局加入`);
             }
+            broadcastState(); // 添加此行
         } else {
             let p = players.find(p => p.userId === data.userId);
             p.id = socket.id;
             io.to(p.id).emit('receive_cards', p.hand);
+            broadcastState(); // 添加此行
         }
-        broadcastState();
     });
 
     socket.on('add_bot', () => {
@@ -578,3 +539,7 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
+
+server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});

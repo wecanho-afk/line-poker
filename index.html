@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>W撲克 - 德州撲克</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <script src="https://static.line-scdn.net/liff/sdk/2.21.1/liff.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background-color: #111; color: #eee; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        .header { background: linear-gradient(to bottom, #333, #111); padding: 5px; text-align: center; border-bottom: 1px solid #444; }
+        .container { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; align-items: center; }
+        
+        .poker-table {
+            background: radial-gradient(circle, #8b1c1c 30%, #4a0d0d 90%);
+            border: 8px solid #333;
+            border-radius: 150px;
+            width: 100%;
+            max-width: 600px;
+            aspect-ratio: 4/5;
+            position: relative;
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.8), 0 10px 20px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .pot-area {
+            position: absolute;
+            top: 20%;
+            text-align: center;
+            z-index: 10;
+        }
+        .pot-icon {
+            font-size: 30px;
+            filter: drop-shadow(0 2px 5px gold);
+        }
+        .pot-text {
+            background: rgba(0,0,0,0.7);
+            border: 1px solid gold;
+            border-radius: 15px;
+            padding: 3px 15px;
+            color: gold;
+            font-weight: bold;
+            margin-top: -10px;
+        }
+
+        .community-cards-area {
+            display: flex;
+            gap: 5px;
+            margin-top: 20px;
+            z-index: 10;
+        }
+
+        .card {
+            background: white;
+            color: black;
+            border-radius: 5px;
+            width: 45px;
+            height: 65px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 1.2em;
+            box-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+            border: 1px solid #ccc;
+        }
+        .card.red { color: #d32f2f; }
+        .card-empty {
+            width: 45px;
+            height: 65px;
+            border: 2px dashed rgba(255,255,255,0.3);
+            border-radius: 5px;
+        }
+
+        .player-seat {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 80px;
+        }
+        
+        /* Positioning 6 players around the table */
+        .seat-0 { bottom: -20px; left: 50%; transform: translateX(-50%); } /* Bottom center (Me) */
+        .seat-1 { bottom: 20%; left: -10px; } /* Bottom left */
+        .seat-2 { top: 20%; left: -10px; } /* Top left */
+        .seat-3 { top: -20px; left: 50%; transform: translateX(-50%); } /* Top center */
+        .seat-4 { top: 20%; right: -10px; } /* Top right */
+        .seat-5 { bottom: 20%; right: -10px; } /* Bottom right */
+
+        .avatar-frame {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #444;
+            border: 2px solid #777;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 25px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+            position: relative;
+            z-index: 5;
+        }
+        .seat-0 .avatar-frame { border-color: #3498db; }
+        .player-seat.active .avatar-frame { border-color: #f1c40f; box-shadow: 0 0 15px #f1c40f; }
+
+        .player-info-box {
+            background: rgba(0,0,0,0.8);
+            border-radius: 5px;
+            padding: 2px 5px;
+            text-align: center;
+            min-width: 70px;
+            margin-top: -10px;
+            z-index: 6;
+            border: 1px solid #555;
+        }
+        .player-name { font-size: 0.7em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: white; }
+        .player-chips { font-size: 0.8em; color: #4CAF50; font-weight: bold; }
+        .player-status { font-size: 0.6em; color: #f1c40f; background: #333; border-radius: 3px; padding: 1px 3px; margin-top: 2px; }
+
+        .role-badge { display:inline-block; border-radius:3px; padding:1px 4px; font-size:0.7em; font-weight:bold; margin-right:2px; box-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
+        .badge-d { background: white; color: black; }
+        .badge-sb { background: #3498db; color: white; }
+        .badge-bb { background: #e74c3c; color: white; }
+
+        .player-cards {
+            display: flex;
+            gap: 2px;
+            position: absolute;
+            top: -30px;
+            right: -30px;
+            transform: scale(0.6);
+            z-index: 4;
+        }
+        /* Specific tweaks for card positions based on seat */
+        .seat-0 .player-cards { top: -45px; right: auto; left: 50%; transform: translateX(-50%) scale(0.9); z-index: 15; }
+        .seat-1 .player-cards, .seat-2 .player-cards { left: 40px; right: auto; }
+        .seat-4 .player-cards, .seat-5 .player-cards { right: 40px; }
+
+        .controls { background: #222; padding: 10px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; border-top: 1px solid #444; }
+        button { border: none; border-radius: 5px; padding: 12px 20px; font-weight: bold; cursor: pointer; transition: transform 0.1s; }
+        button:active { transform: scale(0.95); }
+        .btn-blue { background: #3498db; color: white; }
+        .btn-green { background: #27ae60; color: white; }
+        .btn-red { background: #e74c3c; color: white; }
+        .btn-gold { background: #f1c40f; color: #333; }
+        button:disabled { background: #7f8c8d; cursor: not-allowed; }
+        
+        input { padding: 12px; border-radius: 5px; border: 1px solid #ddd; width: 100px; text-align: center; }
+        
+        .log { background: rgba(0,0,0,0.3); padding: 10px; border-radius: 5px; font-size: 0.9em; max-height: 100px; overflow-y: auto; }
+        .log p { margin: 2px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+
+        .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); align-items: center; justify-content: center; }
+        .modal-content { background: #333; padding: 25px; border-radius: 10px; text-align: center; max-width: 80%; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1 style="margin:0; font-size: 1.5em;">W 撲克</h1>
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0 15px; margin-top: 5px;">
+            <small id="user-info">載入中...</small>
+            
+        <div style="display: flex; gap: 5px;">
+            <button id="voice-toggle" class="btn-blue" style="padding:4px 8px; font-size:0.8em; margin-right: 5px;" onclick="toggleGameVoice()">🔊 遊戲音效: 開</button>
+            <button id="voice-chat-btn" class="btn-blue" style="padding:4px 8px; font-size:0.8em;" onclick="toggleVoiceChat()">📞 開啟通話</button>
+        </div>
+
+        </div>
+    </div>
+
+    <div class="container">
+        <div id="setup-view" class="card-box" style="text-align: center;">
+            <h2>歡迎來到牌桌</h2>
+            <div style="margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; align-items: center;">
+                <button class="btn-green" id="line-login-btn" style="display: none; width: 80%;" onclick="liff.login()">登入 LINE 帳號</button>
+                <input type="text" id="playerNameInput" placeholder="輸入你的暱稱" style="width: 80%; font-size: 1.1em; padding: 10px; border-radius: 5px; border: 1px solid #777; background: #333; color: white; text-align: center;">
+            </div>
+            <p style="margin-top: 0;">請選擇建立或加入遊戲</p>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; gap: 5px; justify-content: center;">
+                    <input type="number" id="initialChipsInput" placeholder="初始籌碼" value="1000">
+                    <button class="btn-blue" onclick="createGame()">建立新遊戲房</button>
+                </div>
+                <div style="display: flex; gap: 5px; justify-content: center; margin-top:10px;">
+                    <input type="text" id="gameIdInput" placeholder="房號">
+                    <button class="btn-green" onclick="joinGame()">加入</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="game-view" style="display: none; flex-direction: column; width: 100%; align-items: center; gap: 10px;">
+            <div style="color: #aaa; font-size: 0.8em; margin-bottom: -10px;">房號: <span id="room-id"></span></div>
+
+            <div id="turn-timer-display" style="color: #ff4757; font-weight: bold; font-size: 1.2em; height: 1.5em; margin-bottom: 5px;"></div>
+
+            
+            <div class="poker-table" id="poker-table">
+                <!-- Pot Area -->
+                <div class="pot-area">
+                    <div class="pot-icon">🏺</div>
+                    <div class="pot-text" id="pot-display">$0</div>
+                </div>
+
+                <!-- Community Cards -->
+                <div class="community-cards-area" id="community-cards">
+                    <!-- Cards will be injected here -->
+                </div>
+
+                <!-- Players will be injected here dynamically -->
+            </div>
+            
+            <div style="text-align: center; display: flex; flex-direction: row; gap: 10px; margin-top: 10px; justify-content: center;">
+                <button id="rebuy-btn" class="btn-green" style="display: none; padding: 8px 12px; font-size: 0.8em;" onclick="rebuy()">💰 重新買入</button>
+                <button id="add-bot-btn" class="btn-blue" style="display: none; padding: 8px 12px; font-size: 0.8em;" onclick="addBot()">🤖 加電腦</button>
+                <button id="start-btn" class="btn-gold" style="display: none; padding: 8px 12px; font-size: 0.8em;" onclick="startGame()">▶️ 開始遊戲</button>
+                <button id="next-btn" class="btn-gold" style="display: none; padding: 8px 12px; font-size: 0.8em;" onclick="performAction('next_round')">⏭️ 下一局</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls" id="game-controls" style="display: none;">
+        <button class="btn-red" onclick="performAction('fold')">蓋牌</button>
+        <button class="btn-blue" onclick="performAction('check')">過牌</button>
+        <button class="btn-blue" onclick="performAction('call')">跟注</button>
+        <div style="display: flex; gap: 5px;">
+            <input type="number" id="raiseAmount" placeholder="加注額">
+            <button class="btn-green" onclick="performAction('raise')">加注</button>
+        </div>
+    </div>
+
+    <script>
+        // 設定區
+        const LIFF_ID = "2010219463-zL3NWwua";
+        const BACKEND_URL = window.location.origin;
+
+        let userId = '';
+        let userName = '';
+        let gameId = '';
+        let isHost = false;
+        let lastActionCount = -1;
+        let gameVoiceEnabled = true;
+
+        function toggleGameVoice() {
+            gameVoiceEnabled = !gameVoiceEnabled;
+            document.getElementById('voice-toggle').textContent = gameVoiceEnabled ? '🔊 遊戲音效: 開' : '🔇 遊戲音效: 關';
+            if (!gameVoiceEnabled && window.speechSynthesis) window.speechSynthesis.cancel();
+        }
+        let userAvatar = '';
+
+        let socket = null;
+        let localStream = null;
+        const peers = {};
+        let timerInterval = null;
+
+        function initSocket() {
+            socket = io(BACKEND_URL);
+            socket.on('connect', () => {
+                if (gameId && userId) {
+                    socket.emit('join_room', { game_id: gameId, user_id: userId });
+                    // 如果斷線重連，主動要一次最新狀態
+                    api(`/get_game_state/${gameId}/${userId}`).then(res => {
+                        if(res.success) updateUI(res.game_state);
+                    });
+                }
+            });
+            socket.on('game_update', state => {
+                const isPlayer = state.players.some(p => p.user_id === userId);
+                if (isPlayer && state.viewer_id !== userId) return; // 忽略發給旁觀者的公版廣播
+                updateUI(state);
+            });
+            
+            socket.on('voice_user_joined', async (remoteSocketId) => {
+                if (!localStream) return;
+                const pc = createPeer(remoteSocketId);
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                socket.emit('voice_signal', { target: remoteSocketId, type: 'offer', sdp: pc.localDescription });
+            });
+
+            socket.on('voice_signal', async ({ from, type, sdp, candidate }) => {
+                if (!localStream) return;
+                let pc = peers[from];
+                if (!pc) pc = createPeer(from);
+
+                if (type === 'offer') {
+                    await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+                    const answer = await pc.createAnswer();
+                    await pc.setLocalDescription(answer);
+                    socket.emit('voice_signal', { target: from, type: 'answer', sdp: pc.localDescription });
+                } else if (type === 'answer') {
+                    await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+                } else if (type === 'candidate') {
+                    await pc.addIceCandidate(new RTCIceCandidate(candidate));
+                }
+            });
+            
+            socket.on('voice_user_left', (remoteSocketId) => {
+                if (peers[remoteSocketId]) {
+                    peers[remoteSocketId].close();
+                    delete peers[remoteSocketId];
+                }
+                const audio = document.getElementById('audio-' + remoteSocketId);
+                if (audio) audio.remove();
+            });
+        }
+
+        async function toggleVoiceChat() {
+            if (!socket) return alert('尚未連線');
+            if (localStream) {
+                localStream.getTracks().forEach(t => t.stop());
+                localStream = null;
+                socket.emit('leave_voice');
+                Object.values(peers).forEach(p => p.close());
+                for (let key in peers) delete peers[key];
+                document.getElementById('voice-chat-btn').textContent = '📞 開啟通話';
+                document.getElementById('voice-chat-btn').classList.replace('btn-red', 'btn-blue');
+            } else {
+                try {
+                    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    socket.emit('join_voice');
+                    document.getElementById('voice-chat-btn').textContent = '📞 關閉通話';
+                    document.getElementById('voice-chat-btn').classList.replace('btn-blue', 'btn-red');
+                } catch (e) { alert('麥克風存取失敗，請確認權限'); }
+            }
+        }
+
+        function createPeer(remoteSocketId) {
+            const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+            peers[remoteSocketId] = pc;
+            localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+            pc.onicecandidate = e => {
+                if (e.candidate) socket.emit('voice_signal', { target: remoteSocketId, type: 'candidate', candidate: e.candidate });
+            };
+            pc.ontrack = e => {
+                let audio = document.getElementById('audio-' + remoteSocketId);
+                if (!audio) {
+                    audio = document.createElement('audio');
+                    audio.id = 'audio-' + remoteSocketId;
+                    audio.autoplay = true;
+                    document.body.appendChild(audio);
+                }
+                audio.srcObject = e.streams[0];
+            };
+            pc.oniceconnectionstatechange = () => {
+                if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+                    pc.close();
+                    delete peers[remoteSocketId];
+                    const audio = document.getElementById('audio-' + remoteSocketId);
+                    if (audio) audio.remove();
+                }
+            };
+            return pc;
+        }
+
+        function startTimerUI(deadline) {
+            if (timerInterval) clearInterval(timerInterval);
+            const timerEl = document.getElementById('turn-timer-display');
+            if (!timerEl) return;
+            timerInterval = setInterval(() => {
+                const remaining = Math.max(0, deadline - Date.now());
+                timerEl.textContent = `⏳ 剩餘思考時間: ${(remaining/1000).toFixed(1)}s`;
+                if (remaining === 0) {
+                    clearInterval(timerInterval);
+                    timerEl.textContent = '';
+                }
+            }, 100);
+        }
+
+
+        
+        async function init() {
+            try {
+                await liff.init({ liffId: LIFF_ID });
+                if (!liff.isLoggedIn()) {
+                    document.getElementById('line-login-btn').style.display = 'block'; // Show login button
+                    try {
+                        liff.login({ redirectUri: window.location.href });
+                        return;
+                    } catch (e) {
+                        console.error('liff.login() error', e);
+                    }
+                } else {
+                    const profile = await liff.getProfile();
+                    userId = profile.userId;
+                    userName = profile.displayName;
+                    userAvatar = profile.pictureUrl || '';
+                    document.getElementById('user-info').textContent = userName;
+                    if(document.getElementById('playerNameInput')) document.getElementById('playerNameInput').value = userName;
+                }
+            } catch (err) {
+                console.error('LIFF Init Error', err);
+                // LIFF 失敗，或者在 LINE App 內但不知為何拿不到資料，給個隨機 ID 以防遊戲卡死
+                if (!userId) userId = 'web_user_' + Math.floor(Math.random() * 10000);
+                if (!userName) userName = '網頁測試';
+                document.getElementById('line-login-btn').style.display = 'none'; // 發生錯誤時隱藏按鈕，避免按了沒反應
+                document.getElementById('user-info').textContent = userName + " (未登入)";
+                if(document.getElementById('playerNameInput')) document.getElementById('playerNameInput').value = userName;
+            }
+            // 無論有沒有登入成功，都初始化 Socket，才能看到遊戲
+            initSocket();
+        }
+
+        async function api(path, method = 'GET', body = null) {
+            const options = {
+                method,
+                headers: { 'Content-Type': 'application/json' }
+            };
+            if (body) options.body = JSON.stringify(body);
+            const res = await fetch(`${BACKEND_URL}${path}`, options);
+            return res.json();
+        }
+
+        async function createGame() {
+            const initialChips = document.getElementById('initialChipsInput').value;
+            const customName = document.getElementById('playerNameInput').value.trim() || userName;
+            const res = await api('/create_game', 'POST', { user_id: userId, user_name: customName, initial_chips: initialChips, avatar: userAvatar });
+            if (res.success) {
+                gameId = res.game_id;
+                isHost = true;
+                if(socket) socket.emit('join_room', { game_id: gameId, user_id: userId });
+                showGame();
+                updateUI(res.game_state);
+            }
+        }
+
+        async function joinGame() {
+            const inputId = document.getElementById('gameIdInput').value.trim().toUpperCase();
+            if (!inputId) return alert('請輸入房號');
+            const customName = document.getElementById('playerNameInput').value.trim() || userName;
+            const res = await api('/join_game', 'POST', { game_id: inputId, user_id: userId, user_name: customName, avatar: userAvatar });
+            if (res.success) {
+                gameId = inputId;
+                if(socket) socket.emit('join_room', { game_id: gameId, user_id: userId });
+                showGame();
+                updateUI(res.game_state);
+            } else {
+                alert(res.message || '加入失敗');
+            }
+        }
+
+        async function addBot() {
+            const res = await api('/add_bot', 'POST', { game_id: gameId, user_id: userId });
+            if (res.success) updateUI(res.game_state);
+            else alert(res.message);
+        }
+
+        async function rebuy() {
+            const initialChips = document.getElementById('initialChipsInput').value || 1000;
+            const res = await api('/rebuy', 'POST', { game_id: gameId, user_id: userId, amount: initialChips });
+            if (res.success) updateUI(res.game_state);
+        }
+
+        function showGame() {
+            document.getElementById('setup-view').style.display = 'none';
+            document.getElementById('game-view').style.display = 'flex';
+            document.getElementById('room-id').textContent = gameId;
+            
+        }
+
+        async function refresh() {
+            if (!gameId) return;
+            const res = await api(`/get_game_state/${gameId}/${userId}`);
+            if (res.success) updateUI(res.game_state);
+        }
+
+        async function startGame() {
+            const res = await api('/start_game', 'POST', { game_id: gameId, user_id: userId });
+            if (res.success) updateUI(res.game_state);
+        }
+
+        async function performAction(action) {
+            let amount = 0;
+            if (action === 'raise') {
+                amount = parseInt(document.getElementById('raiseAmount').value);
+                if (!amount || amount <= 0) return alert('請輸入加注金額');
+            }
+            const res = await api('/game_action', 'POST', {
+                game_id: gameId,
+                user_id: userId,
+                action: action,
+                amount: amount
+            });
+            if (res.success) updateUI(res.game_state);
+        }
+
+        function formatCard(cardStr) {
+            if (cardStr === '??') return `<div class="card" style="background:#555; color:white;">?</div>`;
+            const rank = cardStr[0] === 'T' ? '10' : cardStr[0];
+            const suit = cardStr[1];
+            const isRed = suit === 'h' || suit === 'd';
+            let suitIcon = suit;
+            if(suit==='s') suitIcon='♠️';
+            if(suit==='h') suitIcon='♥️';
+            if(suit==='d') suitIcon='♦️';
+            if(suit==='c') suitIcon='♣️';
+            return `<div class="card ${isRed ? 'red' : ''}">
+                        <span style="font-size:0.8em; align-self:flex-start; margin-left:2px;">${rank}</span>
+                        <span style="font-size:1.5em;">${suitIcon}</span>
+                    </div>`;
+        }
+
+        function updateUI(state) {
+            // 更新公共牌
+            const communityDiv = document.getElementById('community-cards');
+            communityDiv.innerHTML = '';
+            if (state.community_cards.length > 0) {
+                state.community_cards.forEach(c => communityDiv.innerHTML += formatCard(c));
+            } else {
+                for(let i=0; i<5; i++) communityDiv.innerHTML += '<div class="card-empty"></div>';
+            }
+            
+            // 更新底池
+            document.getElementById('pot-display').textContent = `$${state.pot}`;
+
+            // 更新玩家 (圓桌排列)
+            const table = document.getElementById('poker-table');
+            // Remove old players
+            document.querySelectorAll('.player-seat').forEach(e => e.remove());
+
+            // 確保「自己」永遠在下方 (seat-0)
+            let meIndex = state.players.findIndex(p => p.user_id === userId);
+            if (meIndex === -1) meIndex = 0; // 如果自己不在裡面，隨便從 0 開始排
+
+            state.players.forEach((p, i) => {
+                // 計算相對座位 (0~5)
+                let seatNum = (i - meIndex + state.players.length) % state.players.length;
+                if (state.players.length <= 3 && seatNum > 0) {
+                    // 如果人少，把他們散開一點
+                    seatNum = seatNum * 2;
+                }
+                if (seatNum > 5) seatNum = 5; // 限制最多6個位置
+
+                const div = document.createElement('div');
+                div.className = `player-seat seat-${seatNum} ${p.is_current_player ? 'active' : ''}`;
+                
+                let cardsHtml = '';
+                if (!p.folded && p.hand && p.hand.length > 0) {
+                    cardsHtml = `<div class="player-cards">${p.hand.map(c => formatCard(c)).join('')}</div>`;
+                }
+
+                let statusStr = '';
+                if (p.folded) statusStr = '蓋牌';
+                else if (p.all_in) statusStr = '全下';
+                else if (p.last_action === 'check') statusStr = '過牌';
+                else if (p.last_action === 'call') statusStr = `跟注 $${p.current_bet}`;
+                else if (p.last_action === 'raise') statusStr = `加注 $${p.current_bet}`;
+                else if (p.current_bet > 0) statusStr = `$${p.current_bet}`;
+
+                let avatarHtml = '👤';
+                if (p.avatar && p.avatar.startsWith('http')) {
+                    avatarHtml = `<img src="${p.avatar}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`;
+                } else if (p.avatar) {
+                    avatarHtml = p.avatar; // emoji avatar
+                } else if (p.name.includes('Bot')) {
+                    avatarHtml = '🤖';
+                }
+
+                let roleBadge = '';
+                if (p.user_id === state.dealer_id) roleBadge += '<span class="role-badge badge-d">D</span>';
+                if (p.user_id === state.sb_id) roleBadge += '<span class="role-badge badge-sb">SB</span>';
+                if (p.user_id === state.bb_id) roleBadge += '<span class="role-badge badge-bb">BB</span>';
+
+                let winnerClass = '';
+                let winBadge = '';
+                if (state.game_state === 'showdown' && state.winners && state.winners.includes(p.user_id)) {
+                    winnerClass = 'box-shadow: 0 0 20px 10px rgba(255, 215, 0, 0.8); border-color: gold;';
+                    winBadge = `<div style="position:absolute; bottom:-20px; left:50%; transform:translateX(-50%); background:linear-gradient(45deg, #e74c3c, #c0392b); color:gold; padding:2px 8px; border-radius:5px; font-weight:900; font-size:0.8em; border:1px solid gold; z-index:30; text-shadow: 1px 1px 1px black; white-space:nowrap;">🏆 WINNER</div>`;
+                }
+
+                div.innerHTML = `
+                    ${cardsHtml}
+                    <div class="avatar-frame" style="${winnerClass}">${avatarHtml}</div>
+                    <div class="player-info-box">
+                        <div style="margin-bottom:2px;">${roleBadge}</div>
+                        <div class="player-name">${p.name}</div>
+                        <div class="player-chips">$${p.chips}</div>
+                        ${statusStr ? `<div class="player-status">${statusStr}</div>` : ''}
+                    </div>
+                    ${winBadge}
+                `;
+                table.appendChild(div);
+            });
+
+            // 移除原本文字版的遊戲紀錄，因為新版面較小，可以透過上方通知顯示
+            // const logDiv = document.getElementById('game-log');
+            // logDiv.innerHTML = state.last_messages.map(m => `<p>${m}</p>`).join('');
+            // logDiv.scrollTop = logDiv.scrollHeight;
+
+            // 控制按鈕顯示
+            const me = state.players.find(p => p.user_id === userId);
+            const isMyTurn = state.current_player_id === userId;
+            const canAction = ['pre_flop', 'flop', 'turn', 'river'].includes(state.game_state);
+            document.getElementById('game-controls').style.display = (isMyTurn && canAction) ? 'flex' : 'none';
+            
+            if (isMyTurn && canAction) {
+                const raiseInput = document.getElementById('raiseAmount');
+                if (raiseInput) {
+                    raiseInput.placeholder = `最少 $${state.min_raise}`;
+                    raiseInput.min = state.min_raise;
+                }
+            }
+            
+            // 重新買入按鈕
+            const isBusted = me && me.chips === 0;
+            document.getElementById('rebuy-btn').style.display = isBusted ? 'block' : 'none';
+
+            // 房主按鈕
+            const isWaiting = state.game_state === 'waiting_for_players' || state.game_state === 'game_over';
+            document.getElementById('start-btn').style.display = (isHost && isWaiting && state.players.filter(p => p.chips > 0).length >= 2) ? 'block' : 'none';
+            document.getElementById('add-bot-btn').style.display = (isHost && isWaiting && state.players.length < 6) ? 'block' : 'none';
+            
+            const isRoundEnd = state.game_state === 'waiting_for_next_round' || state.game_state === 'showdown' || state.game_state === 'game_over';
+            document.getElementById('next-btn').style.display = (isRoundEnd && state.game_state !== 'game_over' && state.game_state !== 'showdown') ? 'block' : 'none';
+
+            if (state.turn_deadline > 0) {
+                startTimerUI(state.turn_deadline);
+            } else {
+                if (timerInterval) clearInterval(timerInterval);
+                document.getElementById('turn-timer-display').textContent = '';
+            }
+
+            // Game sound effects (TTS)
+            if (state.action_count !== undefined && state.action_count > lastActionCount) {
+                const shouldPlay = (lastActionCount !== -1) && gameVoiceEnabled;
+                lastActionCount = state.action_count;
+                if (shouldPlay && state.latest_voice && window.speechSynthesis) {
+                    window.speechSynthesis.cancel();
+                    const utterance = new SpeechSynthesisUtterance(state.latest_voice);
+                    utterance.lang = 'en-US';
+                    utterance.rate = 1.1;
+                    window.speechSynthesis.speak(utterance);
+                }
+            }
+            
+        }
+
+        init();
+    </script>
+</body>
+</html>

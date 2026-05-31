@@ -171,6 +171,10 @@
                         myDisplayName = profile.displayName;
                         myPictureUrl = profile.pictureUrl || 'https://via.placeholder.com/50';
 
+                        console.log("LIFF Profile - User ID:", profile.userId);
+                        console.log("LIFF Profile - Display Name:", profile.displayName);
+                        console.log("LIFF Profile - Picture URL:", profile.pictureUrl);
+
                         document.getElementById('myName').innerText = myDisplayName;
                         document.getElementById('myAvatar').src = myPictureUrl;
                         document.getElementById('myAvatar').style.display = 'block';
@@ -247,7 +251,6 @@
 
             // Clear existing players and bets
             tablePlayersEl.innerHTML = '';
-
             state.players.forEach((p, idx) => {
                 const isMe = p.userId === myUserId;
                 const playerSeatEl = document.createElement('div');
@@ -294,6 +297,10 @@
                 inGameActions.style.display = 'flex';
 
                 const myPlayer = state.players.find(p => p.userId === myUserId);
+                console.log("My Player:", myPlayer); // Added for Bug 2
+                console.log("Is My Player Active:", myPlayer ? myPlayer.isActive : "N/A"); // Added for Bug 2
+                console.log("Current Stage:", state.stage); // Added for Bug 2
+
                 if (myPlayer && myPlayer.isActive) {
                     inGameActions.querySelectorAll('.btn').forEach(btn => btn.disabled = false);
                     btnCall.innerText = myPlayer.bet < state.currentBet ? `跟注 (${state.currentBet - myPlayer.bet})` : '過牌';
@@ -319,11 +326,11 @@
             // For simplicity, here are some predefined positions for common player counts.
 
             const positions = {
-                2: ['top:20%; left:20%;', 'top:20%; right:20%;'],
-                3: ['top:20%; left:20%;', 'top:20%; right:20%;', 'bottom:-25px; left:50%; transform:translateX(-50%);'],
-                4: ['top:20%; left:10%;', 'top:20%; right:10%;', 'bottom:20%; right:10%;', 'bottom:20%; left:10%;'],
-                5: ['top:10%; left:10%;', 'top:10%; right:10%;', 'bottom:20%; right:0%;', 'bottom:20%; left:0%;', 'bottom:-25px; left:50%; transform:translateX(-50%);'],
-                6: ['top:10%; left:5%;', 'top:10%; right:5%;', 'bottom:20%; right:-5%;', 'bottom:20%; left:-5%;', 'top:50%; right:-20px; transform:translateY(-50%);', 'top:50%; left:-20px; transform:translateY(-50%);']
+                2: ['top:10%; left:15%;', 'top:10%; right:15%;'],
+                3: ['top:10%; left:15%;', 'top:10%; right:15%;', 'bottom:5%; left:50%; transform:translateX(-50%);'], // Adjusted bottom position
+                4: ['top:10%; left:10%;', 'top:10%; right:10%;', 'bottom:5%; right:10%;', 'bottom:5%; left:10%;'], // Adjusted bottom position
+                5: ['top:5%; left:10%;', 'top:5%; right:10%;', 'bottom:5%; right:5%;', 'bottom:5%; left:5%;', 'bottom:1%; left:50%; transform:translateX(-50%);'], // Adjusted bottom position
+                6: ['top:5%; left:5%;', 'top:5%; right:5%;', 'bottom:5%; right:0%;', 'bottom:5%; left:0%;', 'top:50%; right:-10px; transform:translateY(-50%);', 'top:50%; left:-10px; transform:translateY(-50%);'] // Adjusted side players
             };
 
             // Default to 6 positions if more than 6 players or an unsupported number
