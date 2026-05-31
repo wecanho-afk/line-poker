@@ -197,7 +197,6 @@ class TexasHoldemGame {
     }
 
     addBot() {
-        if (this.gameState !== 'waiting_for_players') return [false, "遊戲已開始"];
         if (this.playersOrder.length >= 6) return [false, "牌桌已滿"];
         const botId = 'bot_' + Math.random().toString(36).substr(2, 6);
         const botNames = ['Bot 艾麗絲', 'Bot 鮑伯', 'Bot 查理', 'Bot 戴夫', 'Bot 伊芙'];
