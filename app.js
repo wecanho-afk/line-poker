@@ -182,6 +182,7 @@ class TexasHoldemGame {
         // 如果遊戲已開始，新玩家下一局才能玩；如果還沒開始，可以直接玩
         if (this.gameState !== 'waiting_for_players' && this.gameState !== 'game_over') {
             player.sittingOut = true; 
+            player.waitingForNextRound = true;
             this.messages.push(`${name} 加入了遊戲 (將於下一局參與)。`);
         } else {
             player.sittingOut = false;
@@ -226,6 +227,10 @@ class TexasHoldemGame {
         this.winners = [];
         
         Object.values(this.players).forEach(p => {
+            if (p.waitingForNextRound) {
+                p.waitingForNextRound = false;
+                p.sittingOut = false;
+            }
             if (!p.sittingOut && p.chips > 0) p.resetForNewRound();
             else p.folded = true;
         });
@@ -860,7 +865,13 @@ io.on('connection', socket => {
         socket.userId = user_id;
         socket.gameId = game_id;
         if (GAMES[game_id] && GAMES[game_id].players[user_id]) {
-            GAMES[game_id].players[user_id].sittingOut = false; // Came back!
+            const p = GAMES[game_id].players[user_id];
+            // 如果遊戲進行中且玩家沒有手牌（中途加入），強制 sittingOut 等下一局
+            if (GAMES[game_id].gameState !== 'waiting_for_players' && GAMES[game_id].gameState !== 'game_over' && p.waitingForNextRound) {
+                p.sittingOut = true;
+            } else {
+                p.sittingOut = false; // Came back!
+            }
             if(typeof GAMES[game_id].checkEmptyRoom === 'function') GAMES[game_id].checkEmptyRoom();
             broadcastState(game_id);
         }
