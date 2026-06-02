@@ -23,7 +23,12 @@
         .pot-info { background: rgba(0,0,0,0.65); border-radius: 20px; padding: 6px 20px; font-weight: bold; font-size: 15px; margin-bottom: 12px; border: 1px solid #f1c40f; color: #f1c40f; box-shadow: 0 4px 10px rgba(0,0,0,0.5); display: flex; flex-direction: column; align-items: center; }
         
         .card-container { display: flex; gap: 5px; justify-content: center; align-items: center; min-height: 65px; }
-        .card { width: 44px; height: 62px; background: #fff; border-radius: 6px; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 18px; box-shadow: 2px 2px 6px rgba(0,0,0,0.5); position: relative; overflow: hidden; border: 1px solid #ddd; }
+        .card { width: 44px; height: 62px; perspective: 1000px; background: transparent; }
+        .card-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.6s; transform-style: preserve-3d; }
+        .card.hidden .card-inner { transform: rotateY(180deg); }
+        .card-front, .card-back { position: absolute; top:0; left:0; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 6px; box-shadow: 2px 2px 6px rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; font-weight: bold; border: 1px solid #ddd; font-size: 18px; box-sizing: border-box; }
+        .card-front { background: #fff; }
+        .card-back { background: repeating-linear-gradient(45deg, #1a2a38, #1a2a38 5px, #2c3e50 5px, #2c3e50 10px); transform: rotateY(180deg); border: 2px solid #fff; }
         .red { color: #d32f2f; }
         .black { color: #212121; }
 
@@ -66,7 +71,8 @@
 
         /* My big cards */
         .my-cards-display { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 15; display: flex; gap: 5px; }
-        .my-cards-display .card { width: 55px; height: 80px; font-size: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.8); border: 2px solid #fff; }
+        .my-cards-display .card { width: 55px; height: 80px; }
+          .my-cards-display .card-front, .my-cards-display .card-back { font-size: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.8); border: 2px solid #fff; }
 
         /* Settings Modal */
         .settings-modal { position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.8); z-index: 100; display: flex; justify-content: center; align-items: center; display: none; }
@@ -234,10 +240,11 @@
         const raiseValText = document.getElementById('raiseValText');
         
         function renderCard(card) {
-            const suitChar = card.suit === 's' ? '♠' : card.suit === 'h' ? '♥' : card.suit === 'd' ? '♦' : '♣';
+            if (card === 'hidden' || !card) return `<div class="card hidden"><div class="card-inner"><div class="card-front"></div><div class="card-back"></div></div></div>`;
+            const suitChar = card.suit === 's' ? '?' : card.suit === 'h' ? '?' : card.suit === 'd' ? '?' : '?';
             const rankChar = card.rank === 'T' ? '10' : card.rank;
             const colorClass = (card.suit === 'h' || card.suit === 'd') ? 'red' : 'black';
-            return `<div class="card ${colorClass}">${rankChar}<br>${suitChar}</div>`;
+            return `<div class="card"><div class="card-inner"><div class="card-front ${colorClass}">${rankChar}<br>${suitChar}</div><div class="card-back"></div></div></div>`;
         }
 
         function updateRaiseDisplay() {
@@ -247,7 +254,33 @@
         socket.on('game_state', (state) => {
             // Update UI elements based on the received game state
             potAmount.innerText = state.pot;
-            communityCardsEl.innerHTML = state.communityCards.map(renderCard).join('');
+            
+            // Check if community cards changed to trigger flip animation
+            const currentCardsStr = communityCardsEl.getAttribute('data-cards') || '';
+            const newCardsStr = JSON.stringify(state.communityCards);
+            
+            if (currentCardsStr !== newCardsStr) {
+                communityCardsEl.setAttribute('data-cards', newCardsStr);
+                
+                // Render with hidden class first for new cards
+                const existingCount = (currentCardsStr === '' || currentCardsStr === '[]') ? 0 : JSON.parse(currentCardsStr).length;
+                
+                communityCardsEl.innerHTML = state.communityCards.map((c, i) => {
+                    if (i >= existingCount) {
+                        return `<div class="card hidden new-card"><div class="card-inner"><div class="card-front ${(c.suit === 'h' || c.suit === 'd') ? 'red' : 'black'}">${c.rank === 'T' ? '10' : c.rank}<br>${c.suit === 's' ? '?' : c.suit === 'h' ? '?' : c.suit === 'd' ? '?' : '?'}</div><div class="card-back"></div></div></div>`;
+                    } else {
+                        return renderCard(c);
+                    }
+                }).join('');
+                
+                // Trigger flip after a tiny delay
+                setTimeout(() => {
+                    document.querySelectorAll('.new-card').forEach(el => {
+                        el.classList.remove('hidden', 'new-card');
+                    });
+                }, 50);
+            }
+
 
             // Clear existing players and bets
             tablePlayersEl.innerHTML = '';
@@ -271,6 +304,7 @@
                         <span class="player-chips">${p.chips}</span>
                         <span class="player-timer" id="timer-${p.id}"></span>
                     </div>
+                    ${(!p.folded && p.isActive && state.stage !== 'waiting' && state.stage !== 'showdown' && p.userId !== myUserId) ? '<div style="position:absolute; bottom:-15px; display:flex; gap:2px; transform:scale(0.5); z-index:3;">' + renderCard('hidden') + renderCard('hidden') + '</div>' : ''}
                     ${p.bet > 0 ? `<div class="bet-bubble">${p.bet}</div>` : ''}
                 `;
                 tablePlayersEl.appendChild(playerSeatEl);
@@ -283,8 +317,8 @@
                     playerSeatEl.appendChild(revealedCardsEl);
                 }
 
-                if (isMe) {
-                    document.getElementById('myCardsArea').innerHTML = state.players.find(pl => pl.userId === myUserId).hand.map(renderCard).join('');
+                if (isMe && p.hand) {
+                    document.getElementById('myCardsArea').innerHTML = p.hand.map(renderCard).join('');
                 }
             });
 
