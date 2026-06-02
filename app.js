@@ -11,10 +11,11 @@ const io = new Server(server, { cors: { origin: '*' } });
 const broadcastState = (gameId) => {
     const game = GAMES[gameId];
     if (!game) return;
-    game.playersOrder.forEach(uid => {
-        io.to(uid).emit('game_update', game.toJSON(uid));
+    io.in(gameId).fetchSockets().then(sockets => {
+        sockets.forEach(socket => {
+            socket.emit('game_update', game.toJSON(socket.userId));
+        });
     });
-    io.to(gameId).emit('game_update', game.toJSON(null));
 };
 
 app.use(cors());
@@ -514,24 +515,23 @@ class TexasHoldemGame {
 
     makeBotDecision(bot) {
         if (!['pre_flop', 'flop', 'turn', 'river'].includes(this.gameState) || bot.allIn || bot.folded) return;
-        const callAmount = this.currentBetAmount - bot.currentBet;
-        const minRaise = this.currentBetAmount + this.lastRaiseAmount;
-        let action = 'fold';
-        let amount = 0;
-        const rand = Math.random();
+        
+        // Use GTO logic for decision
+        const decision = PokerBotGTO.decide(this, bot);
+        
+        let action = decision.action;
+        let amount = decision.amount;
 
-        if (callAmount === 0) {
-            if (rand < 0.8) action = 'check';
-            else { action = 'raise'; amount = minRaise; }
-        } else {
-            if (rand < 0.2) action = 'fold';
-            else if (rand < 0.8) action = 'call';
-            else { action = 'raise'; amount = minRaise; }
-            
-            if (action === 'raise' && bot.chips < (amount - bot.currentBet)) {
+        // Fallback safety
+        if (action === 'raise' && bot.chips < (amount - bot.currentBet)) {
+            if (bot.chips + bot.currentBet > (this.currentBetAmount - bot.currentBet)) {
+                amount = bot.chips + bot.currentBet;
+            } else {
                 action = 'call';
             }
         }
+
+        console.log(`[GTO Bot] ${bot.name} (Hand: ${bot.hand.map(c=>c.rank+c.suit).join(',')}) Action: ${action}, Amount: ${amount}`);
         this.playerAction(bot.userId, action, amount);
     }
 
