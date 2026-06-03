@@ -17,7 +17,7 @@
             border-radius: 150px;
             width: 100%;
             max-width: 600px;
-            aspect-ratio: 4/5;
+            aspect-ratio: 3/4; padding: 20px 0;
             position: relative;
             box-shadow: inset 0 0 50px rgba(0,0,0,0.8), 0 10px 20px rgba(0,0,0,0.5);
             display: flex;
@@ -67,8 +67,39 @@
             font-size: 1.2em;
             box-shadow: 1px 1px 3px rgba(0,0,0,0.5);
             border: 1px solid #ccc;
+            position: relative;
+            transform-style: preserve-3d;
+            perspective: 1000px;
         }
+
+        .card span {
+            backface-visibility: hidden;
+        }
+        
+        /* Card back pseudo-element for flip animation */
+        .card::after {
+            content: '';
+            position: absolute;
+            top: -1px; left: -1px; right: -1px; bottom: -1px;
+            background: repeating-linear-gradient(45deg, #1a237e, #1a237e 5px, #283593 5px, #283593 10px);
+            border: 2px solid white;
+            border-radius: 5px;
+            backface-visibility: hidden;
+            transform: rotateY(180deg);
+        }
+        
         .card.red { color: #d32f2f; }
+        
+        @keyframes dealAndFlip {
+            0% { transform: translateY(-40px) scale(0.8) rotateY(180deg); opacity: 0; }
+            20% { transform: translateY(-20px) scale(1.1) rotateY(180deg); opacity: 1; }
+            50% { transform: translateY(0) scale(1) rotateY(180deg); opacity: 1; }
+            100% { transform: translateY(0) scale(1) rotateY(0deg); opacity: 1; }
+        }
+        .card.animate-deal {
+            animation: dealAndFlip 0.8s ease-out forwards;
+        }
+
         .card-empty {
             width: 45px;
             height: 65px;
@@ -84,13 +115,15 @@
             width: 80px;
         }
         
-        /* Positioning 6 players around the table */
+        /* Positioning 8 players around the table */
         .seat-0 { bottom: -20px; left: 50%; transform: translateX(-50%); } /* Bottom center (Me) */
-        .seat-1 { bottom: 20%; left: -10px; } /* Bottom left */
-        .seat-2 { top: 20%; left: -10px; } /* Top left */
-        .seat-3 { top: -20px; left: 50%; transform: translateX(-50%); } /* Top center */
-        .seat-4 { top: 20%; right: -10px; } /* Top right */
-        .seat-5 { bottom: 20%; right: -10px; } /* Bottom right */
+        .seat-1 { bottom: 5%; left: -10px; } /* Bottom left */
+        .seat-2 { top: 40%; left: -10px; transform: translateY(-50%); } /* Mid left */
+        .seat-3 { top: 5%; left: -10px; } /* Top left */
+        .seat-4 { top: -20px; left: 50%; transform: translateX(-50%); } /* Top center */
+        .seat-5 { top: 5%; right: -10px; } /* Top right */
+        .seat-6 { top: 40%; right: -10px; transform: translateY(-50%); } /* Mid right */
+        .seat-7 { bottom: 5%; right: -10px; } /* Bottom right */ /* Bottom right */
 
         .avatar-frame {
             width: 50px;
@@ -110,6 +143,8 @@
         .player-seat.active .avatar-frame { border-color: #f1c40f; box-shadow: 0 0 15px #f1c40f; }
 
         .player-info-box {
+            z-index: 20;
+            position: relative;
             background: rgba(0,0,0,0.8);
             border-radius: 5px;
             padding: 2px 5px;
@@ -129,6 +164,7 @@
         .badge-bb { background: #e74c3c; color: white; }
 
         .player-cards {
+            z-index: 25;
             display: flex;
             gap: 2px;
             position: absolute;
@@ -139,8 +175,9 @@
         }
         /* Specific tweaks for card positions based on seat */
         .seat-0 .player-cards { top: -45px; right: auto; left: 50%; transform: translateX(-50%) scale(0.9); z-index: 15; }
-        .seat-1 .player-cards, .seat-2 .player-cards { left: 40px; right: auto; }
-        .seat-4 .player-cards, .seat-5 .player-cards { right: 40px; }
+        .seat-1 .player-cards, .seat-2 .player-cards, .seat-3 .player-cards { left: 55px; right: auto; z-index: 15; top: -10px; }
+        .seat-5 .player-cards, .seat-6 .player-cards, .seat-7 .player-cards { right: 55px; left: auto; z-index: 15; top: -10px; }
+        .seat-4 .player-cards { top: 55px; right: auto; left: 50%; transform: translateX(-50%) scale(0.9); z-index: 15; }
 
         .controls { background: #222; padding: 10px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; border-top: 1px solid #444; }
         button { border: none; border-radius: 5px; padding: 12px 20px; font-weight: bold; cursor: pointer; transition: transform 0.1s; }
@@ -184,7 +221,14 @@
             <p style="margin-top: 0;">請選擇建立或加入遊戲</p>
             <div style="display: flex; flex-direction: column; gap: 10px;">
                 <div style="display: flex; gap: 5px; justify-content: center;">
-                    <input type="number" id="initialChipsInput" placeholder="初始籌碼" value="1000">
+                    <select id="gameModeInput" style="padding: 10px; border-radius: 5px; border: 1px solid #777; background: #333; color: white;">
+                        <option value="cash">常規賽</option>
+                        <option value="tournament">錦標賽</option>
+                    </select>
+<input type="number" id="initialChipsInput" placeholder="初始籌碼" value="1000">
+                    <input type="number" id="smallBlindInput" placeholder="初始小盲注 (預設10)" value="10">
+                    <input type="number" id="blindDurationInput" placeholder="升盲時間(秒, 預設600)" value="600" style="display: none;" id="durationWrapper">
+                    <input type="number" id="maxReEntryInput" placeholder="重買次數 (預設2, 0為凍結賽)" value="2" style="display: none;">
                     <button class="btn-blue" onclick="createGame()">建立新遊戲房</button>
                 </div>
                 <div style="display: flex; gap: 5px; justify-content: center; margin-top:10px;">
@@ -198,6 +242,7 @@
             <div style="color: #aaa; font-size: 0.8em; margin-bottom: -10px;">房號: <span id="room-id"></span></div>
 
             <div id="turn-timer-display" style="color: #ff4757; font-weight: bold; font-size: 1.2em; height: 1.5em; margin-bottom: 5px;"></div>
+              <div id="tournament-info-display" style="color: #f1c40f; font-weight: bold; font-size: 1em; height: 1.5em; margin-bottom: 5px; display: none;"></div>
 
             
             <div class="poker-table" id="poker-table">
@@ -225,10 +270,18 @@
     </div>
 
     <div class="controls" id="game-controls" style="display: none;">
-        <button class="btn-red" onclick="performAction('fold')">蓋牌</button>
-        <button class="btn-blue" onclick="performAction('check')">過牌</button>
-        <button class="btn-blue" onclick="performAction('call')">跟注</button>
-        <div style="display: flex; gap: 5px;">
+        <div style="display: flex; gap: 5px; justify-content: center; width: 100%; flex-wrap: wrap;">
+            <button class="btn-red" onclick="performAction('fold')">蓋牌</button>
+            <button class="btn-blue" onclick="performAction('check')">讓牌</button>
+            <button class="btn-blue" onclick="performAction('call')">跟注</button>
+        </div>
+        <div style="display: flex; gap: 5px; justify-content: center; width: 100%; flex-wrap: wrap; margin-top: 5px;">
+            <button class="btn-gold" style="padding: 8px 12px; font-size: 0.8em;" onclick="setQuickBet(1/3)">1/3底池</button>
+            <button class="btn-gold" style="padding: 8px 12px; font-size: 0.8em;" onclick="setQuickBet(1/2)">1/2底池</button>
+            <button class="btn-gold" style="padding: 8px 12px; font-size: 0.8em;" onclick="setQuickBet(2/3)">2/3底池</button>
+            <button class="btn-gold" style="padding: 8px 12px; font-size: 0.8em;" onclick="setQuickBet('allin')">All In</button>
+        </div>
+        <div style="display: flex; gap: 5px; justify-content: center; width: 100%; margin-top: 5px;">
             <input type="number" id="raiseAmount" placeholder="加注額">
             <button class="btn-green" onclick="performAction('raise')">加注</button>
         </div>
@@ -416,10 +469,19 @@
             return res.json();
         }
 
+        
+        document.getElementById('gameModeInput')?.addEventListener('change', function(e) {
+            const dur = document.getElementById('blindDurationInput');
+            if(dur) dur.style.display = e.target.value === 'tournament' ? 'inline-block' : 'none';
+            const reEntry = document.getElementById('maxReEntryInput');
+            if(reEntry) reEntry.style.display = e.target.value === 'tournament' ? 'inline-block' : 'none';
+        });
+
         async function createGame() {
             const initialChips = document.getElementById('initialChipsInput').value;
+            const gameMode = document.getElementById('gameModeInput') ? document.getElementById('gameModeInput').value : 'cash';
             const customName = document.getElementById('playerNameInput').value.trim() || userName;
-            const res = await api('/create_game', 'POST', { user_id: userId, user_name: customName, initial_chips: initialChips, avatar: userAvatar });
+            const res = await api('/create_game', 'POST', { user_id: userId, user_name: customName, initial_chips: initialChips, avatar: userAvatar, game_mode: gameMode, small_blind: document.getElementById('smallBlindInput')?.value, blind_duration: document.getElementById('blindDurationInput')?.value, max_re_entry: document.getElementById('maxReEntryInput')?.value });
             if (res.success) {
                 gameId = res.game_id;
                 isHost = true;
@@ -454,6 +516,7 @@
             const initialChips = document.getElementById('initialChipsInput').value || 1000;
             const res = await api('/rebuy', 'POST', { game_id: gameId, user_id: userId, amount: initialChips });
             if (res.success) updateUI(res.game_state);
+            else alert(res.message || '買入失敗');
         }
 
         function showGame() {
@@ -474,6 +537,28 @@
             if (res.success) updateUI(res.game_state);
         }
 
+        
+        function setQuickBet(fraction) {
+            let pot = window.currentPot || 0;
+            let currentBet = window.currentBetAmount || 0;
+            let myChips = window.myChips || 0;
+            let minRaise = window.minRaise || 0;
+            
+            let amount = 0;
+            if (fraction === 'allin') {
+                amount = myChips + currentBet;
+            } else {
+                amount = currentBet + Math.floor(pot * fraction);
+            }
+            
+            // Constrain
+            if (amount < minRaise && fraction !== 'allin') amount = minRaise;
+            if (amount > myChips + currentBet) amount = myChips + currentBet;
+            
+            document.getElementById('raiseAmount').value = amount;
+            performAction('raise');
+        }
+
         async function performAction(action) {
             let amount = 0;
             if (action === 'raise') {
@@ -489,8 +574,11 @@
             if (res.success) updateUI(res.game_state);
         }
 
-        function formatCard(cardStr) {
-            if (cardStr === '??') return `<div class="card" style="background:#555; color:white;">?</div>`;
+        let knownCommunityCards = [];
+        let knownPlayerCards = {};
+
+        function formatCard(cardStr, isNew = false) {
+            if (cardStr === '??') return `<div class="card ${isNew ? 'animate-deal' : ''}" style="background:#555; color:white;">?</div>`;
             const rank = cardStr[0] === 'T' ? '10' : cardStr[0];
             const suit = cardStr[1];
             const isRed = suit === 'h' || suit === 'd';
@@ -499,18 +587,54 @@
             if(suit==='h') suitIcon='♥️';
             if(suit==='d') suitIcon='♦️';
             if(suit==='c') suitIcon='♣️';
-            return `<div class="card ${isRed ? 'red' : ''}">
+            return `<div class="card ${isRed ? 'red' : ''} ${isNew ? 'animate-deal' : ''}">
                         <span style="font-size:0.8em; align-self:flex-start; margin-left:2px;">${rank}</span>
                         <span style="font-size:1.5em;">${suitIcon}</span>
                     </div>`;
         }
 
+        
+        let tournamentInterval = null;
+        
         function updateUI(state) {
+            window.currentPot = state.pot;
+            window.currentBetAmount = state.current_bet_amount;
+            window.minRaise = state.min_raise;
+            const meObj = state.players.find(p => p.user_id === userId);
+            window.myChips = meObj ? meObj.chips : 0;
+
+            if (state.tournament_info) {
+                document.getElementById('tournament-info-display').style.display = 'block';
+                let remaining = state.tournament_info.remaining_seconds;
+                const updateTournamentTimer = () => {
+                    const min = Math.floor(remaining / 60);
+                    const sec = remaining % 60;
+                    document.getElementById('tournament-info-display').textContent = `[錦標賽] Level ${state.tournament_info.level} (${state.tournament_info.smallBlind}/${state.tournament_info.bigBlind}) - 升盲倒數: ${min}:${sec.toString().padStart(2, '0')}`;
+                    if (remaining > 0 && state.game_state !== 'game_over' && state.game_state !== 'waiting_for_players') remaining--;
+                };
+                updateTournamentTimer();
+                if (tournamentInterval) clearInterval(tournamentInterval);
+                tournamentInterval = setInterval(updateTournamentTimer, 1000);
+            } else {
+                document.getElementById('tournament-info-display').style.display = 'none';
+                if (tournamentInterval) clearInterval(tournamentInterval);
+            }
+
             // 更新公共牌
             const communityDiv = document.getElementById('community-cards');
             communityDiv.innerHTML = '';
+            
+            if (state.community_cards.length === 0) {
+                knownCommunityCards = [];
+                knownPlayerCards = {};
+            }
+
             if (state.community_cards.length > 0) {
-                state.community_cards.forEach(c => communityDiv.innerHTML += formatCard(c));
+                state.community_cards.forEach((c, idx) => {
+                    const isNew = idx >= knownCommunityCards.length;
+                    communityDiv.innerHTML += formatCard(c, isNew);
+                });
+                knownCommunityCards = state.community_cards.slice();
             } else {
                 for(let i=0; i<5; i++) communityDiv.innerHTML += '<div class="card-empty"></div>';
             }
@@ -529,19 +653,39 @@
 
             state.players.forEach((p, i) => {
                 // 計算相對座位 (0~5)
-                let seatNum = (i - meIndex + state.players.length) % state.players.length;
-                if (state.players.length <= 3 && seatNum > 0) {
-                    // 如果人少，把他們散開一點
-                    seatNum = seatNum * 2;
+                
+                let seatMapping = [];
+                switch (state.players.length) {
+                    case 2: seatMapping = [0, 4]; break;
+                    case 3: seatMapping = [0, 3, 5]; break;
+                    case 4: seatMapping = [0, 2, 4, 6]; break;
+                    case 5: seatMapping = [0, 2, 3, 5, 6]; break;
+                    case 6: seatMapping = [0, 1, 3, 4, 5, 7]; break;
+                    case 7: seatMapping = [0, 1, 2, 3, 4, 5, 7]; break;
+                    case 8: seatMapping = [0, 1, 2, 3, 4, 5, 6, 7]; break;
+                    default: seatMapping = [0]; break;
                 }
-                if (seatNum > 5) seatNum = 5; // 限制最多6個位置
-
+                let relIndex = (i - meIndex + state.players.length) % state.players.length;
+                let seatNum = seatMapping[relIndex] !== undefined ? seatMapping[relIndex] : 0;
+                
                 const div = document.createElement('div');
                 div.className = `player-seat seat-${seatNum} ${p.is_current_player ? 'active' : ''}`;
+                // Elevate z-index if this player has cards to show during showdown, or is active
+                if (p.is_current_player || (state.game_state === 'showdown' && !p.folded)) {
+                    div.style.zIndex = 30;
+                }
                 
                 let cardsHtml = '';
                 if (!p.folded && p.hand && p.hand.length > 0) {
-                    cardsHtml = `<div class="player-cards">${p.hand.map(c => formatCard(c)).join('')}</div>`;
+                    const knownHand = knownPlayerCards[p.user_id] || [];
+                    const renderedHand = p.hand.map((c, idx) => {
+                        const isNew = idx >= knownHand.length || knownHand[idx] !== c;
+                        return formatCard(c, isNew);
+                    }).join('');
+                    knownPlayerCards[p.user_id] = p.hand.slice();
+                    cardsHtml = `<div class="player-cards">${renderedHand}</div>`;
+                } else {
+                    knownPlayerCards[p.user_id] = [];
                 }
 
                 let statusStr = '';
@@ -613,7 +757,7 @@
             // 房主按鈕
             const isWaiting = state.game_state === 'waiting_for_players' || state.game_state === 'game_over';
             document.getElementById('start-btn').style.display = (isHost && isWaiting && state.players.filter(p => p.chips > 0).length >= 2) ? 'block' : 'none';
-            document.getElementById('add-bot-btn').style.display = (isHost && isWaiting && state.players.length < 6) ? 'block' : 'none';
+            document.getElementById('add-bot-btn').style.display = (isHost && isWaiting && state.players.length < 8) ? 'block' : 'none';
             
             const isRoundEnd = state.game_state === 'waiting_for_next_round' || state.game_state === 'showdown' || state.game_state === 'game_over';
             document.getElementById('next-btn').style.display = (isRoundEnd && state.game_state !== 'game_over' && state.game_state !== 'showdown') ? 'block' : 'none';

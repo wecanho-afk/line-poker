@@ -91,9 +91,122 @@ class Player {
     canBet() { return !this.folded && !this.allIn && !this.sittingOut && this.chips > 0; }
 }
 
+
+class TournamentManager {
+    constructor(config, blindSchedule) {
+        this.config = config || { startingChips: 10000, maxReEntry: 2, reEntryCutoffLevel: 6 };
+        this.blindSchedule = blindSchedule || [
+            { level: 1, smallBlind: 50, bigBlind: 100, ante: 0, durationSeconds: 600 },
+            { level: 2, smallBlind: 75, bigBlind: 150, ante: 0, durationSeconds: 600 },
+            { level: 3, smallBlind: 100, bigBlind: 200, ante: 25, durationSeconds: 600 },
+            { level: 4, smallBlind: 150, bigBlind: 300, ante: 25, durationSeconds: 600 },
+            { level: 5, smallBlind: 200, bigBlind: 400, ante: 50, durationSeconds: 600 },
+            { level: 6, smallBlind: 300, bigBlind: 600, ante: 75, durationSeconds: 600 },
+            { level: 7, smallBlind: 400, bigBlind: 800, ante: 100, durationSeconds: 600 },
+            { level: 8, smallBlind: 500, bigBlind: 1000, ante: 100, durationSeconds: 600 },
+            { level: 9, smallBlind: 600, bigBlind: 1200, ante: 200, durationSeconds: 600 }
+        ];
+        
+        this.currentLevelIndex = 0;
+        this.levelStartTime = 0;
+        this.playersStats = {};
+        this.eliminatedRanks = [];
+        this.started = false;
+    }
+
+    initPlayer(playerId) {
+        if (!this.playersStats[playerId]) {
+            this.playersStats[playerId] = {
+                playerId: playerId,
+                reEntriesUsed: 0,
+                isEliminated: false,
+                rank: null
+            };
+        }
+    }
+
+    startTournament() {
+        if (!this.started) {
+            this.levelStartTime = Date.now();
+            this.started = true;
+        }
+    }
+
+    getCurrentBlind() {
+        return this.blindSchedule[Math.min(this.currentLevelIndex, this.blindSchedule.length - 1)];
+    }
+
+    getRemainingTime() {
+        if (!this.started) return this.getCurrentBlind().durationSeconds;
+        const now = Date.now();
+        const elapsedSeconds = (now - this.levelStartTime) / 1000;
+        return Math.max(0, this.getCurrentBlind().durationSeconds - Math.floor(elapsedSeconds));
+    }
+
+    checkAndUpgradeBlinds() {
+        if (!this.started) return false;
+        const currentLevel = this.getCurrentBlind();
+        const now = Date.now();
+        const elapsedSeconds = (now - this.levelStartTime) / 1000;
+
+        if (elapsedSeconds >= currentLevel.durationSeconds && 
+            this.currentLevelIndex < this.blindSchedule.length - 1) {
+            
+            this.currentLevelIndex++;
+            this.levelStartTime = now;
+            return true;
+        }
+        return false;
+    }
+
+    handlePlayerBust(playerId, totalPlayers) {
+        const stats = this.playersStats[playerId];
+        if (!stats) return 'ELIMINATED';
+
+        const currentLevel = this.getCurrentBlind();
+        const isReEntryOpen = currentLevel.level <= this.config.reEntryCutoffLevel;
+
+        if (isReEntryOpen && stats.reEntriesUsed < this.config.maxReEntry) {
+            return 'CAN_REENTRY';
+        } else {
+            if (!stats.isEliminated) {
+                stats.isEliminated = true;
+                this.eliminatedRanks.push(playerId);
+                stats.rank = totalPlayers - this.eliminatedRanks.length + 1;
+            }
+            return 'ELIMINATED';
+        }
+    }
+
+    executeReEntry(playerId) {
+        const stats = this.playersStats[playerId];
+        if (stats) {
+            stats.reEntriesUsed++;
+            return this.config.startingChips;
+        }
+        return 0;
+    }
+}
+
 class TexasHoldemGame {
-    constructor(gameId, hostUserId, hostName, initialChips = 1000) {
+    constructor(gameId, hostUserId, hostName, initialChips = 1000, gameMode = "cash", smallBlind = 10, blindDuration = 600, maxReEntry = 2) {
         this.gameId = gameId;
+        this.gameMode = gameMode;
+        
+        const sbMults = [1, 1.5, 2, 3, 4, 6, 8, 10, 15, 20, 30, 40, 60, 80, 120, 160, 200, 300, 400, 600];
+        const anteMults = [0, 0, 0.5, 0.5, 1, 1.5, 2, 2, 3, 4, 6, 8, 10, 15, 20, 30, 40, 60, 80, 100];
+        const defaultSchedule = [];
+        for (let i = 0; i < 20; i++) {
+            defaultSchedule.push({
+                level: i + 1,
+                smallBlind: Math.floor(smallBlind * sbMults[i]),
+                bigBlind: Math.floor(smallBlind * sbMults[i]) * 2,
+                ante: Math.floor(smallBlind * anteMults[i]),
+                durationSeconds: blindDuration
+            });
+        }
+        this.tournamentManager = gameMode === "tournament" ? new TournamentManager({ startingChips: initialChips, maxReEntry: maxReEntry, reEntryCutoffLevel: 6 }, defaultSchedule) : null;
+
         this.initialChips = initialChips;
         this.players = {};
         this.playersOrder = [];
@@ -109,7 +222,7 @@ class TexasHoldemGame {
         this.currentPlayerIdx = 0;
         this.gameState = 'waiting_for_players';
         this.messages = [];
-        this.blinds = { small: 10, big: 20 };
+        this.blinds = { small: parseInt(smallBlind), big: parseInt(smallBlind) * 2 };
         this.winners = [];
         this.actionCount = 0;
         this.latestVoice = '';
@@ -175,7 +288,7 @@ class TexasHoldemGame {
     }
 
     addPlayer(userId, name, avatar = '') {
-        if (this.playersOrder.length >= 6) return [false, "房間已滿"];
+        if (this.playersOrder.length >= 8) return [false, "房間已滿"];
         if (this.players[userId]) return [false, "你已經在房間中"];
 
         const player = new Player(userId, name, this.initialChips);
@@ -192,6 +305,7 @@ class TexasHoldemGame {
         }
         
         this.players[userId] = player;
+        if (this.tournamentManager) this.tournamentManager.initPlayer(userId);
         this.playersOrder.push(userId);
         
         // Broadcast the updated state so everyone sees the new player immediately
@@ -199,10 +313,10 @@ class TexasHoldemGame {
     }
 
     addBot() {
-        if (this.playersOrder.length >= 6) return [false, "牌桌已滿"];
+        if (this.playersOrder.length >= 8) return [false, "牌桌已滿"];
         const botId = 'bot_' + Math.random().toString(36).substr(2, 6);
-        const botNames = ['Bot 艾麗絲', 'Bot 鮑伯', 'Bot 查理', 'Bot 戴夫', 'Bot 伊芙'];
-        const botAvatars = ['🤖', '👽', '👻', '👾', '🎃'];
+        const botNames = ['Bot 艾蜜莉', 'Bot 查理', 'Bot 丹尼', 'Bot 艾力克斯', 'Bot 布萊恩', 'Bot 菲力普', 'Bot 葛瑞絲', 'Bot 漢娜', 'Bot 伊凡'];
+        const botAvatars = ['👱‍♀️', '👨‍', '👦', '🧔', '👱‍♂️', '👨‍🦱', '👩‍🦰', '👩‍🦱', '👲'];
         const botName = botNames[this.playersOrder.length % botNames.length];
         const botAvatar = botAvatars[this.playersOrder.length % botAvatars.length];
         const [ok, msg] = this.addPlayer(botId, botName, botAvatar);
@@ -226,6 +340,16 @@ class TexasHoldemGame {
         this.pot = 0;
         this.currentBetAmount = 0;
         this.winners = [];
+        
+        if (this.tournamentManager) {
+            this.tournamentManager.startTournament();
+            const upgraded = this.tournamentManager.checkAndUpgradeBlinds();
+            const currentBlind = this.tournamentManager.getCurrentBlind();
+            this.blinds = { small: currentBlind.smallBlind, big: currentBlind.bigBlind };
+            if (upgraded) {
+                this.messages.push(`[錦標賽] 盲注升級至 ${this.blinds.small}/${this.blinds.big}`);
+            }
+        }
         
         Object.values(this.players).forEach(p => {
             if (p.waitingForNextRound) {
@@ -707,12 +831,30 @@ class TexasHoldemGame {
     prepareNext() {
         const busted = Object.keys(this.players).filter(id => this.players[id].chips === 0 && !this.players[id].sittingOut);
         busted.forEach(id => {
-            if (this.players[id].isBot) {
-                this.players[id].chips = this.initialChips;
-                this.messages.push(`${this.players[id].name} 自動重新買入了 $${this.initialChips}`);
+            if (this.tournamentManager) {
+                const totalPlayers = Object.keys(this.players).length;
+                const status = this.tournamentManager.handlePlayerBust(id, totalPlayers);
+                if (status === 'CAN_REENTRY') {
+                    if (this.players[id].isBot) {
+                        this.players[id].chips = this.tournamentManager.executeReEntry(id);
+                        this.messages.push(`[錦標賽] ${this.players[id].name} 自動 Re-entry`);
+                    } else {
+                        this.players[id].sittingOut = true;
+                        this.messages.push(`[錦標賽] ${this.players[id].name} 籌碼歸零，可選擇 Re-entry`);
+                    }
+                } else {
+                    this.players[id].sittingOut = true;
+                    const rank = this.tournamentManager.playersStats[id].rank;
+                    this.messages.push(`[錦標賽] ${this.players[id].name} 遭到淘汰！名次：第 ${rank} 名`);
+                }
             } else {
-                this.players[id].sittingOut = true;
-                this.messages.push(`${this.players[id].name} 籌碼歸零，等待重新買入`);
+                if (this.players[id].isBot) {
+                    this.players[id].chips = this.initialChips;
+                    this.messages.push(`${this.players[id].name} 已自動買入 ${this.initialChips}`);
+                } else {
+                    this.players[id].sittingOut = true;
+                    this.messages.push(`${this.players[id].name} 籌碼歸零，請手動買入`);
+                }
             }
         });
 
@@ -720,7 +862,12 @@ class TexasHoldemGame {
         
         if (activePlayers.length < 2) {
             this.gameState = 'game_over';
-            this.messages.push("活躍玩家不足，等待玩家買入。");
+            if (this.tournamentManager && activePlayers.length === 1) {
+                const winnerId = activePlayers[0];
+                this.messages.push(`[錦標賽] 恭喜 ${this.players[winnerId].name} 獲得冠軍！`);
+            } else {
+                this.messages.push("剩餘玩家不足，遊戲結束。");
+            }
         } else {
             this.gameState = 'waiting_for_next_round';
         }
@@ -730,7 +877,17 @@ class TexasHoldemGame {
         return {
             viewer_id: userId,
             game_id: this.gameId,
+            game_mode: this.gameMode,
             game_state: this.gameState,
+            tournament_info: this.tournamentManager ? {
+                level: this.tournamentManager.getCurrentBlind().level,
+                smallBlind: this.tournamentManager.getCurrentBlind().smallBlind,
+                bigBlind: this.tournamentManager.getCurrentBlind().bigBlind,
+                ante: this.tournamentManager.getCurrentBlind().ante,
+                remaining_seconds: this.tournamentManager.getRemainingTime(),
+                playersStats: this.tournamentManager.playersStats,
+                maxReEntry: this.tournamentManager.config.maxReEntry
+            } : null,
             pot: this.pot,
             current_bet_amount: this.currentBetAmount,
             turn_deadline: this.turnDeadline,
@@ -769,10 +926,10 @@ class TexasHoldemGame {
 const GAMES = {};
 
 app.post('/create_game', (req, res) => {
-    const { user_id, user_name, initial_chips, avatar } = req.body;
+    const { user_id, user_name, initial_chips, avatar, game_mode, small_blind, blind_duration, max_re_entry } = req.body;
     const chips = parseInt(initial_chips) || 1000;
     const gameId = Math.random().toString(36).substr(2, 8).toUpperCase();
-    GAMES[gameId] = new TexasHoldemGame(gameId, user_id, user_name, chips);
+    GAMES[gameId] = new TexasHoldemGame(gameId, user_id, user_name, chips, game_mode || "cash", parseInt(small_blind) || 10, parseInt(blind_duration) || 600, parseInt(max_re_entry) ?? 2);
     if (avatar) GAMES[gameId].players[user_id].avatar = avatar;
     res.json({ success: true, game_id: gameId, game_state: GAMES[gameId].toJSON(user_id) });
     broadcastState(gameId);
@@ -806,25 +963,37 @@ app.post('/add_bot', (req, res) => {
 app.post('/rebuy', (req, res) => {
     const { game_id, user_id, amount } = req.body;
     const game = GAMES[game_id];
-    if (!game) return res.status(404).json({ success: false, message: "房號不存在" });
-    const player = game.players[user_id];
-    if (!player) return res.status(404).json({ success: false, message: "玩家不在遊戲中" });
-    
-    const buyIn = parseInt(amount) || game.initialChips;
-    player.chips += buyIn;
-    player.sittingOut = false;
-    game.messages.push(`${player.name} 重新買入了 $${buyIn}`);
-    
-    if (game.gameState === 'game_over') {
-        const activePlayers = game.playersOrder.filter(id => !game.players[id].sittingOut);
-        if (activePlayers.length >= 2) {
-            game.gameState = 'waiting_for_next_round';
+    if (!game) return res.status(404).json({ success: false, message: 'Game not found' });
+    const p = game.players[user_id];
+    if (!p) return res.json({ success: false });
+
+    if (game.tournamentManager) {
+        if (p.chips === 0) {
+            const status = game.tournamentManager.handlePlayerBust(user_id, Object.keys(game.players).length);
+            if (status === 'CAN_REENTRY') {
+                const newChips = game.tournamentManager.executeReEntry(user_id);
+                p.chips = newChips;
+                p.sittingOut = false;
+                game.messages.push(`${p.name} 執行了 Re-entry`);
+                res.json({ success: true, game_state: game.toJSON(user_id) });
+                broadcastState(game_id);
+                return;
+            } else {
+                return res.json({ success: false, message: '無法 Re-entry (超出次數或已關閉)' });
+            }
+        } else {
+            return res.json({ success: false, message: '籌碼歸零才能 Re-entry' });
         }
     }
-    
+
+    const a = parseInt(amount) || 1000;
+    p.chips += a;
+    p.sittingOut = false;
+    game.messages.push(`${p.name} 買入了 ${a}`);
     res.json({ success: true, game_state: game.toJSON(user_id) });
     broadcastState(game_id);
 });
+    
 
 app.post('/start_game', (req, res) => {
     const { game_id, user_id } = req.body;
