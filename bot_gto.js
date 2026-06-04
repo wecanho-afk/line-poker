@@ -3,10 +3,10 @@ class PokerBotGTO {
     // Generate a random personality profile for the bot
     static generatePersonality() {
         return {
-            // 中心偏移至經過演化出來的最佳策略 (Golden Parameters)
-            aggression: 0.65 + (Math.random() - 0.5) * 0.4, // 0.45 ~ 0.85
-            tightness: 0.47 + (Math.random() - 0.5) * 0.3,  // 0.32 ~ 0.62
-            bluffFreq: 0.97 + (Math.random() - 0.5) * 0.4   // 0.77 ~ 1.17
+            // 中心偏移至經過混合對手池演化出來的最佳策略 (Golden Parameters)
+            aggression: 2.18 + (Math.random() - 0.5) * 0.4, // 1.98 ~ 2.38
+            tightness: 0.44 + (Math.random() - 0.5) * 0.3,  // 0.29 ~ 0.59
+            bluffFreq: 2.34 + (Math.random() - 0.5) * 0.4   // 2.14 ~ 2.54
         };
     }
 
