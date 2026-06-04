@@ -307,6 +307,7 @@
             <button class="btn-gold" style="padding: 8px 12px; font-size: 0.8em;" onclick="setQuickBet(1/3)">1/3底池</button>
             <button class="btn-gold" style="padding: 8px 12px; font-size: 0.8em;" onclick="setQuickBet(1/2)">1/2底池</button>
             <button class="btn-gold" style="padding: 8px 12px; font-size: 0.8em;" onclick="setQuickBet(2/3)">2/3底池</button>
+            <button class="btn-gold" style="padding: 8px 12px; font-size: 0.8em;" onclick="setQuickBet(1)">滿底池</button>
             <button class="btn-gold" style="padding: 8px 12px; font-size: 0.8em;" onclick="setQuickBet('allin')">All In</button>
         </div>
             <div style="display: flex; gap: 5px; justify-content: center; width: 100%; margin-top: 5px;">
@@ -619,8 +620,14 @@
         async function performAction(action) {
             let amount = 0;
             if (action === 'raise') {
-                amount = parseInt(document.getElementById('raiseAmount').value);
+                amount = Math.round(parseFloat(document.getElementById('raiseAmount').value));
                 if (!amount || amount <= 0) return alert('請輸入加注金額');
+            }
+            if (action === 'raise' && amount >= (window.myChips + window.myCurrentBet)) {
+                // 如果是 All-In，播放戰鼓音效
+                const audio = new Audio('https://www.soundjay.com/misc/sounds/drum-roll-1.mp3');
+                audio.volume = 0.5;
+                audio.play().catch(e => console.error("Audio play failed:", e));
             }
             const res = await api('/game_action', 'POST', {
                 game_id: gameId,

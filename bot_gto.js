@@ -1,5 +1,14 @@
 // Helper class to evaluate hand strength for the bot and decide actions
 class PokerBotGTO {
+    // Generate a random personality profile for the bot
+    static generatePersonality() {
+        return {
+            aggression: 0.5 + Math.random() * 1.0, // 0.5 (passive) to 1.5 (hyper-aggressive)
+            tightness: 0.5 + Math.random() * 1.0,  // 0.5 (loose) to 1.5 (tight)
+            bluffFreq: 0.5 + Math.random() * 1.0   // 0.5 (honest) to 1.5 (bluffer)
+        };
+    }
+
     static getHandStrength(hand, communityCards) {
         if (!hand || hand.length !== 2) return 0;
         const val = (r) => {
@@ -28,6 +37,12 @@ class PokerBotGTO {
     static decide(game, bot) {
         if (!['pre_flop', 'flop', 'turn', 'river'].includes(game.gameState) || bot.allIn || bot.folded) return {action: 'fold', amount: 0};
         
+        // Ensure bot has a personality
+        if (!bot.personality) {
+            bot.personality = this.generatePersonality();
+        }
+        const { aggression, tightness, bluffFreq } = bot.personality;
+
         const callAmount = game.currentBetAmount - bot.currentBet;
         const minRaise = game.currentBetAmount + game.lastRaiseAmount;
         const pot = game.pot;
@@ -50,23 +65,26 @@ class PokerBotGTO {
 
         const handScore = this.getHandStrength(bot.hand, game.communityCards);
         
+        // Adjust hand score threshold based on tightness (higher tightness = requires higher score)
+        const effectiveScore = handScore / tightness;
+
         // Stage logic
         if (game.gameState === 'pre_flop') {
-            if (handScore > 80) { // Premium (AA, KK, QQ, AKs)
+            if (effectiveScore > 80) { // Premium
                 action = 'raise';
-                amount = Math.max(minRaise, pot * 0.8 + callAmount);
-            } else if (handScore > 65) { // Strong
+                amount = Math.max(minRaise, pot * (0.6 + rand * 0.4 * aggression) + callAmount);
+            } else if (effectiveScore > 65) { // Strong
                 if (callAmount === 0 || callAmount <= game.smallBlind * 4) {
-                    action = rand < 0.3 ? 'raise' : 'call';
+                    action = (rand * aggression > 0.4) ? 'raise' : 'call';
                     amount = minRaise;
                 } else {
                     action = 'call';
                 }
-            } else if (handScore > 50) { // Playable
+            } else if (effectiveScore > 50) { // Playable
                 if (callAmount === 0 || callAmount <= game.smallBlind * 2) {
                     action = 'call';
                 } else if (isLatePosition && callAmount === 0) {
-                    action = rand < 0.4 ? 'raise' : 'call'; // Steal
+                    action = (rand * aggression > 0.5) ? 'raise' : 'call'; // Steal
                     amount = minRaise;
                 } else {
                     action = 'fold';
@@ -74,7 +92,7 @@ class PokerBotGTO {
             } else { // Weak
                 action = (callAmount === 0) ? 'check' : 'fold';
                 // Occasional bluff steal from late position if folded to us
-                if (isLatePosition && callAmount === 0 && numActive <= 3 && rand < 0.15) {
+                if (isLatePosition && callAmount === 0 && numActive <= 3 && (rand * bluffFreq > 0.75)) {
                     action = 'raise';
                     amount = minRaise;
                 }
@@ -99,30 +117,35 @@ class PokerBotGTO {
                 else currentStr = 20; // High card
             }
             
+            // Adjust current strength based on personality (aggression increases perceived strength)
+            currentStr = currentStr * (1 + (aggression - 1) * 0.2);
+
             // Aggression logic
             if (currentStr > 80) { // Value
                 action = 'raise';
-                let betSize = pot * (rand < 0.5 ? 0.6 : 1.0); // 60% or 100% pot
+                let betSize = pot * (rand < 0.5 ? 0.5 : 1.0) * aggression; 
                 amount = Math.max(minRaise, Math.floor(betSize) + callAmount);
             } else if (currentStr > 50) { // Marginal
                 if (callAmount === 0) {
-                    action = rand < 0.5 ? 'check' : 'raise';
+                    action = (rand * aggression > 0.6) ? 'raise' : 'check';
                     amount = minRaise;
                 } else {
-                    action = callAmount <= pot * 0.5 ? 'call' : 'fold';
+                    if (callAmount > pot * 0.5 && rand > 0.5 * tightness) action = 'fold';
+                    else action = 'call';
                 }
             } else { // Air / Weak
                 if (callAmount === 0) {
                     // Bluff frequency based on position and active players
-                    bluffProb = isLatePosition && numActive <= 2 ? 0.3 : 0.1;
+                    bluffProb = (isLatePosition && numActive <= 2 ? 0.3 : 0.1) * bluffFreq;
                     if (rand < bluffProb) {
                         action = 'raise';
-                        amount = Math.max(minRaise, Math.floor(pot * 0.5)); // Half pot bluff
+                        amount = Math.max(minRaise, Math.floor(pot * 0.5 * aggression)); // Half pot bluff
                     } else {
                         action = 'check';
                     }
                 } else {
-                    action = 'fold';
+                    if (callAmount <= pot * 0.2 && rand > 0.5) action = 'call'; // Float
+                    else action = 'fold';
                 }
             }
         }
@@ -136,6 +159,9 @@ class PokerBotGTO {
                 action = 'call';
             }
         }
+        
+        // 四捨五入下注金額至整數位
+        if (amount > 0) amount = Math.round(amount);
         
         // Standardize check/fold if call=0
         if (action === 'fold' && callAmount === 0) action = 'check';
