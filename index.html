@@ -175,9 +175,8 @@
         }
         /* Specific tweaks for card positions based on seat */
         .seat-0 .player-cards { top: -45px; right: auto; left: 50%; transform: translateX(-50%) scale(0.9); z-index: 15; }
-        .seat-1 .player-cards, .seat-2 .player-cards, .seat-3 .player-cards { left: 55px; right: auto; z-index: 15; top: -10px; }
+        .seat-1 .player-cards, .seat-2 .player-cards, .seat-3 .player-cards, .seat-4 .player-cards { left: 55px; right: auto; z-index: 15; top: -10px; }
         .seat-5 .player-cards, .seat-6 .player-cards, .seat-7 .player-cards { right: 55px; left: auto; z-index: 15; top: -10px; }
-        .seat-4 .player-cards { top: 55px; right: auto; left: 50%; transform: translateX(-50%) scale(0.9); z-index: 15; }
 
         .controls { background: #222; padding: 10px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; border-top: 1px solid #444; }
         button { border: none; border-radius: 5px; padding: 12px 20px; font-weight: bold; cursor: pointer; transition: transform 0.1s; }
@@ -219,6 +218,16 @@
                 <input type="text" id="playerNameInput" placeholder="輸入你的暱稱" style="width: 80%; font-size: 1.1em; padding: 10px; border-radius: 5px; border: 1px solid #777; background: #333; color: white; text-align: center;">
                 <div id="avatarSelection" style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 5px;">
                     <span style="width: 100%; font-size: 0.9em; color: #ccc;">選擇頭像：</span>
+                    <div class="avatar-option" onclick="selectAvatar('👱‍♂️')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">👱‍♂️</div>
+                    <div class="avatar-option" onclick="selectAvatar('👨‍🦰')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">👨‍🦰</div>
+                    <div class="avatar-option" onclick="selectAvatar('👩‍🦱')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">👩‍🦱</div>
+                    <div class="avatar-option" onclick="selectAvatar('👴')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">👴</div>
+                    <div class="avatar-option" onclick="selectAvatar('👵')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">👵</div>
+                    <div class="avatar-option" onclick="selectAvatar('👽')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">👽</div>
+                    <div class="avatar-option" onclick="selectAvatar('🤡')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">🤡</div>
+                    <div class="avatar-option" onclick="selectAvatar('💩')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">💩</div>
+                    <div class="avatar-option" onclick="selectAvatar('👻')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">👻</div>
+                    <div class="avatar-option" onclick="selectAvatar('🤠')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">🤠</div>
                     <div class="avatar-option" onclick="selectAvatar('🐶')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">🐶</div>
                     <div class="avatar-option" onclick="selectAvatar('🐱')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">🐱</div>
                     <div class="avatar-option" onclick="selectAvatar('🦊')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">🦊</div>
@@ -300,14 +309,22 @@
             <button class="btn-gold" style="padding: 8px 12px; font-size: 0.8em;" onclick="setQuickBet(2/3)">2/3底池</button>
             <button class="btn-gold" style="padding: 8px 12px; font-size: 0.8em;" onclick="setQuickBet('allin')">All In</button>
         </div>
-        <div style="display: flex; gap: 5px; justify-content: center; width: 100%; margin-top: 5px;">
-            <input type="number" id="raiseAmount" placeholder="加注額">
-            <button class="btn-green" onclick="performAction('raise')">加注</button>
+            <div style="display: flex; gap: 5px; justify-content: center; width: 100%; margin-top: 5px;">
+                <input type="number" id="raiseAmount" placeholder="加注額">
+                <button class="btn-green" onclick="performAction('raise')">加注</button>
+            </div>
         </div>
-    </div>
 
-    <script>
-        // 設定區
+        <div id="settlementModal" class="modal">
+            <div class="modal-content" style="max-width: 300px;">
+                <h2 style="color: gold; margin-top: 0;">🏆 錦標賽結算 🏆</h2>
+                <div id="settlementList" style="text-align: left; max-height: 250px; overflow-y: auto; margin: 15px 0; font-size: 1.1em; line-height: 1.5;"></div>
+                <button class="btn-blue" onclick="document.getElementById('settlementModal').style.display='none'">關閉</button>
+            </div>
+        </div>
+
+        <script>
+            // 設定區
         const LIFF_ID = "2010219463-zL3NWwua";
         const BACKEND_URL = window.location.origin;
 
@@ -510,7 +527,7 @@
         });
 
         async function createGame() {
-            const customName = document.getElementById('playerNameInput').value.trim() || userName;
+            const customName = document.getElementById('playerNameInput').value.trim();
             if (!customName) return alert('請輸入您的暱稱');
             if (!userAvatar) return alert('請選擇一個頭像');
             
@@ -530,7 +547,7 @@
         async function joinGame() {
             const inputId = document.getElementById('gameIdInput').value.trim().toUpperCase();
             if (!inputId) return alert('請輸入房號');
-            const customName = document.getElementById('playerNameInput').value.trim() || userName;
+            const customName = document.getElementById('playerNameInput').value.trim();
             if (!customName) return alert('請輸入您的暱稱');
             if (!userAvatar) return alert('請選擇一個頭像');
             
@@ -792,7 +809,7 @@
             }
             
             // 重新買入按鈕
-            const isBusted = me && me.chips === 0;
+            const isBusted = me && me.chips === 0 && (me.folded || !['pre_flop', 'flop', 'turn', 'river'].includes(state.game_state) || state.game_state === 'showdown');
             document.getElementById('rebuy-btn').style.display = isBusted ? 'block' : 'none';
 
             // 房主按鈕
@@ -808,6 +825,27 @@
             } else {
                 if (timerInterval) clearInterval(timerInterval);
                 document.getElementById('turn-timer-display').textContent = '';
+            }
+
+            if (state.game_state === 'game_over' && state.tournament_info && state.tournament_info.playersStats) {
+                const stats = state.tournament_info.playersStats;
+                const sortedPlayers = Object.values(stats).sort((a, b) => a.rank - b.rank);
+                let html = '';
+                sortedPlayers.forEach(p => {
+                    const medal = p.rank === 1 ? '🥇' : p.rank === 2 ? '🥈' : p.rank === 3 ? '🥉' : '';
+                    const name = state.players.find(pl => pl.user_id === p.playerId)?.name || p.playerId;
+                    html += `<div style="padding: 5px; border-bottom: 1px solid #555;">${p.rank}. ${medal} <b>${name}</b></div>`;
+                });
+                const modal = document.getElementById('settlementModal');
+                if (modal) {
+                    document.getElementById('settlementList').innerHTML = html;
+                    if (modal.style.display !== 'flex') {
+                        modal.style.display = 'flex';
+                    }
+                }
+            } else {
+                const modal = document.getElementById('settlementModal');
+                if (modal) modal.style.display = 'none';
             }
 
             // Game sound effects (TTS)

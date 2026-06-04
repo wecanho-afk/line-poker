@@ -30,6 +30,8 @@ let turnTimer = null;
 let turnInterval = null;
 let turnTimeLeft = 20;
 let lastHandWinnerIds = []; // 新增：記錄上一手贏家ID，用於前端顯示"win"
+let currentHandCount = 0; // Fixed: define missing variables
+let maxHands = 50; // Fixed: define missing variables
 const HAND_END_DELAY_MS = 5000; // 新增：每手結束後的延遲時間 (毫秒)
 
 function handlePlayerAction(p, actionData) {
