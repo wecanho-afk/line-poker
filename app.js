@@ -656,8 +656,13 @@ class TexasHoldemGame {
             }
         }
 
-        console.log(`[GTO Bot] ${bot.name} (Hand: ${bot.hand.map(c=>c.rank+c.suit).join(',')}) Action: ${action}, Amount: ${amount}`);
-        this.playerAction(bot.userId, action, amount);
+        // console.log(`[GTO Bot] ${bot.name} (Hand: ${bot.hand.map(c=>c.rank+c.suit).join(',')}) Action: ${action}, Amount: ${amount}`);
+        const res = this.playerAction(bot.userId, action, amount);
+        if (res && res[0] === false) {
+             // force fold if invalid
+             this.players[bot.userId].hasActed = false; // reset flag
+             this.playerAction(bot.userId, 'fold');
+        }
     }
 
     evaluateHand(cards) {
@@ -1063,4 +1068,8 @@ io.on('connection', socket => {
 });
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+if (!process.env.NO_SERVER) {
+    server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+}
+
+module.exports = { TexasHoldemGame, Card, Deck, GAMES, broadcastState, server, io };
