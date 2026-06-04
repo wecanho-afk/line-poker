@@ -3,10 +3,13 @@ class PokerBotGTO {
     // Generate a random personality profile for the bot
     static generatePersonality() {
         return {
-            // 中心偏移至經過混合對手池演化出來的最佳策略 (Golden Parameters)
-            aggression: 2.18 + (Math.random() - 0.5) * 0.4, // 1.98 ~ 2.38
-            tightness: 0.44 + (Math.random() - 0.5) * 0.3,  // 0.29 ~ 0.59
-            bluffFreq: 2.34 + (Math.random() - 0.5) * 0.4   // 2.14 ~ 2.54
+            // 中心偏移至經過自我對弈演化出來的 GTO 最佳策略
+            aggression: 1.71 + (Math.random() - 0.5) * 0.4, 
+            tightness: 0.15 + (Math.random() - 0.5) * 0.1,  
+            bluffFreq: 2.12 + (Math.random() - 0.5) * 0.4,
+            posAware: 0.92 + (Math.random() - 0.5) * 0.3,
+            evAware: 1.03 + (Math.random() - 0.5) * 0.3,
+            stackAware: 1.80 + (Math.random() - 0.5) * 0.3
         };
     }
 
@@ -42,7 +45,10 @@ class PokerBotGTO {
         if (!bot.personality) {
             bot.personality = this.generatePersonality();
         }
-        const { aggression, tightness, bluffFreq } = bot.personality;
+        // 向下相容
+        if (bot.personality.posAware === undefined) Object.assign(bot.personality, { posAware: 1.0, evAware: 1.0, stackAware: 1.0 });
+        
+        const { aggression, tightness, bluffFreq, posAware, evAware, stackAware } = bot.personality;
 
         const callAmount = game.currentBetAmount - bot.currentBet;
         const minRaise = game.currentBetAmount + game.lastRaiseAmount;
@@ -66,8 +72,29 @@ class PokerBotGTO {
 
         const handScore = this.getHandStrength(bot.hand, game.communityCards);
         
-        // Adjust hand score threshold based on tightness (higher tightness = requires higher score)
-        const effectiveScore = handScore / tightness;
+        // --- EV & 動態意識計算 ---
+        
+        // 1. 位置意識 (Position Awareness)
+        // 在前位需要更強的牌，在後位可以玩更鬆
+        let posModifier = 1.0;
+        if (isEarlyPosition) posModifier = 1.0 + (0.3 * posAware);
+        if (isLatePosition) posModifier = 1.0 - (0.3 * posAware);
+
+        // 2. 賠率與 EV 意識 (Pot Odds / EV Awareness)
+        // Pot Odds = 需跟注金額 / (目前底池 + 需跟注金額)
+        // 如果賠率很差 (例如對手下重注)，需要更強的牌才能繼續
+        let potOdds = callAmount > 0 ? callAmount / (pot + callAmount) : 0;
+        let oddsModifier = 1.0;
+        if (potOdds > 0.25) oddsModifier = 1.0 + (potOdds * 2.0 * evAware); 
+
+        // 3. 籌碼量意識 (Stack/SPR Awareness)
+        // 如果 SPR 很低 (已經投入大量籌碼)，會更傾向打到底 (套牢)；如果籌碼很深，打得更謹慎
+        let sprModifier = 1.0;
+        if (spr < 2.0) sprModifier = 1.0 - (0.4 * stackAware); // SPR低，降低要求(易打光)
+        if (spr > 8.0) sprModifier = 1.0 + (0.2 * stackAware); // SPR高，提高要求(謹慎)
+
+        // 綜合所有意識，調整對手牌分數的嚴謹度要求
+        const effectiveScore = (handScore / tightness) / posModifier / oddsModifier / sprModifier;
 
         // Stage logic
         if (game.gameState === 'pre_flop') {
