@@ -225,6 +225,16 @@
                     <div class="avatar-option" onclick="selectAvatar('🐼')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">🐼</div>
                     <div class="avatar-option" onclick="selectAvatar('🦁')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">🦁</div>
                     <div class="avatar-option" onclick="selectAvatar('🐸')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">🐸</div>
+                    <div class="avatar-option" onclick="selectAvatar('🐻')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">🐻</div>
+                    <div class="avatar-option" onclick="selectAvatar('🐯')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">🐯</div>
+                    <div class="avatar-option" onclick="selectAvatar('🐰')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">🐰</div>
+                    <div class="avatar-option" onclick="selectAvatar('🐷')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">🐷</div>
+                    <div class="avatar-option" onclick="selectAvatar('🐵')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">🐵</div>
+                    <div class="avatar-option" onclick="selectAvatar('🦄')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">🦄</div>
+                    <div class="avatar-option" onclick="selectAvatar('🦉')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">🦉</div>
+                    <div class="avatar-option" onclick="selectAvatar('🐙')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">🐙</div>
+                    <div class="avatar-option" onclick="selectAvatar('🐧')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">🐧</div>
+                    <div class="avatar-option" onclick="selectAvatar('🦖')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">🦖</div>
                 </div>
             </div>
             <p style="margin-top: 0;">請選擇建立或加入遊戲</p>
@@ -472,9 +482,9 @@
                 console.error('LIFF Init Error', err);
                 // LIFF 失敗，或者在 LINE App 內但不知為何拿不到資料，給個隨機 ID 以防遊戲卡死
                 if (!userId) userId = 'web_user_' + Math.floor(Math.random() * 10000);
-                if (!userName) userName = '網頁測試';
+                if (!userName) userName = '';
                 document.getElementById('line-login-btn').style.display = 'none'; // 發生錯誤時隱藏按鈕，避免按了沒反應
-                document.getElementById('user-info').textContent = userName + " (未登入)";
+                document.getElementById('user-info').textContent = userName ? userName : "未登入";
                 if(document.getElementById('playerNameInput')) document.getElementById('playerNameInput').value = userName;
             }
             // 無論有沒有登入成功，都初始化 Socket，才能看到遊戲
@@ -500,9 +510,13 @@
         });
 
         async function createGame() {
+            const customName = document.getElementById('playerNameInput').value.trim() || userName;
+            if (!customName) return alert('請輸入您的暱稱');
+            if (!userAvatar) return alert('請選擇一個頭像');
+            
             const initialChips = document.getElementById('initialChipsInput').value;
             const gameMode = document.getElementById('gameModeInput') ? document.getElementById('gameModeInput').value : 'cash';
-            const customName = document.getElementById('playerNameInput').value.trim() || userName;
+            
             const res = await api('/create_game', 'POST', { user_id: userId, user_name: customName, initial_chips: initialChips, avatar: userAvatar, game_mode: gameMode, small_blind: document.getElementById('smallBlindInput')?.value, blind_duration: document.getElementById('blindDurationInput')?.value, max_re_entry: document.getElementById('maxReEntryInput')?.value });
             if (res.success) {
                 gameId = res.game_id;
@@ -517,6 +531,9 @@
             const inputId = document.getElementById('gameIdInput').value.trim().toUpperCase();
             if (!inputId) return alert('請輸入房號');
             const customName = document.getElementById('playerNameInput').value.trim() || userName;
+            if (!customName) return alert('請輸入您的暱稱');
+            if (!userAvatar) return alert('請選擇一個頭像');
+            
             const res = await api('/join_game', 'POST', { game_id: inputId, user_id: userId, user_name: customName, avatar: userAvatar });
             if (res.success) {
                 gameId = inputId;
