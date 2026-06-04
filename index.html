@@ -217,6 +217,15 @@
             <div style="margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; align-items: center;">
                 <button class="btn-green" id="line-login-btn" style="display: none; width: 80%;" onclick="liff.login()">登入 LINE 帳號</button>
                 <input type="text" id="playerNameInput" placeholder="輸入你的暱稱" style="width: 80%; font-size: 1.1em; padding: 10px; border-radius: 5px; border: 1px solid #777; background: #333; color: white; text-align: center;">
+                <div id="avatarSelection" style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 5px;">
+                    <span style="width: 100%; font-size: 0.9em; color: #ccc;">選擇頭像：</span>
+                    <div class="avatar-option" onclick="selectAvatar('🐶')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">🐶</div>
+                    <div class="avatar-option" onclick="selectAvatar('🐱')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">🐱</div>
+                    <div class="avatar-option" onclick="selectAvatar('🦊')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">🦊</div>
+                    <div class="avatar-option" onclick="selectAvatar('🐼')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">🐼</div>
+                    <div class="avatar-option" onclick="selectAvatar('🦁')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">🦁</div>
+                    <div class="avatar-option" onclick="selectAvatar('🐸')" style="font-size: 24px; cursor: pointer; padding: 5px; border: 2px solid transparent; border-radius: 50%;">🐸</div>
+                </div>
             </div>
             <p style="margin-top: 0;">請選擇建立或加入遊戲</p>
             <div style="display: flex; flex-direction: column; gap: 10px;">
@@ -305,6 +314,19 @@
             if (!gameVoiceEnabled && window.speechSynthesis) window.speechSynthesis.cancel();
         }
         let userAvatar = '';
+
+        function selectAvatar(emoji) {
+            userAvatar = emoji;
+            document.querySelectorAll('.avatar-option').forEach(el => {
+                if (el.innerText === emoji) {
+                    el.style.borderColor = '#f1c40f';
+                    el.style.backgroundColor = 'rgba(241, 196, 15, 0.2)';
+                } else {
+                    el.style.borderColor = 'transparent';
+                    el.style.backgroundColor = 'transparent';
+                }
+            });
+        }
 
         let socket = null;
         let localStream = null;
@@ -542,18 +564,19 @@
             let pot = window.currentPot || 0;
             let currentBet = window.currentBetAmount || 0;
             let myChips = window.myChips || 0;
+            let myCurrentBet = window.myCurrentBet || 0;
             let minRaise = window.minRaise || 0;
             
             let amount = 0;
             if (fraction === 'allin') {
-                amount = myChips + currentBet;
+                amount = myChips + myCurrentBet;
             } else {
                 amount = currentBet + Math.floor(pot * fraction);
             }
             
             // Constrain
             if (amount < minRaise && fraction !== 'allin') amount = minRaise;
-            if (amount > myChips + currentBet) amount = myChips + currentBet;
+            if (amount > myChips + myCurrentBet) amount = myChips + myCurrentBet;
             
             document.getElementById('raiseAmount').value = amount;
             performAction('raise');
@@ -602,6 +625,7 @@
             window.minRaise = state.min_raise;
             const meObj = state.players.find(p => p.user_id === userId);
             window.myChips = meObj ? meObj.chips : 0;
+            window.myCurrentBet = meObj ? meObj.current_bet : 0;
 
             if (state.tournament_info) {
                 document.getElementById('tournament-info-display').style.display = 'block';
