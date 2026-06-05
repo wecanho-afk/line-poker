@@ -3,199 +3,137 @@ class PokerBotGTO {
     // Generate a random personality profile for the bot
     static generatePersonality() {
         return {
-            // 中心偏移至經過自我對弈演化出來的 GTO 最佳策略
-            aggression: 1.71 + (Math.random() - 0.5) * 0.4, 
-            tightness: 0.15 + (Math.random() - 0.5) * 0.1,  
-            bluffFreq: 2.12 + (Math.random() - 0.5) * 0.4,
-            posAware: 0.92 + (Math.random() - 0.5) * 0.3,
-            evAware: 1.03 + (Math.random() - 0.5) * 0.3,
-            stackAware: 1.80 + (Math.random() - 0.5) * 0.3
+            strongThreshold: 0.65 + (Math.random() - 0.5) * 0.1,
+            midThreshold: 0.40 + (Math.random() - 0.5) * 0.1,
+            drawBluffProb: 0.40 + (Math.random() - 0.5) * 0.2,
+            airBluffProb: 0.10 + (Math.random() - 0.5) * 0.05,
+            epsilon: 0.10 + (Math.random() - 0.5) * 0.05
         };
     }
 
-    static getHandStrength(hand, communityCards) {
-        if (!hand || hand.length !== 2) return 0;
-        const val = (r) => {
-            const map = {'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'T':10,'J':11,'Q':12,'K':13,'A':14};
-            return map[r] || 0;
-        };
-        const r1 = val(hand[0].rank);
-        const r2 = val(hand[1].rank);
-        const suited = hand[0].suit === hand[1].suit;
-        const high = Math.max(r1, r2);
-        const low = Math.min(r1, r2);
+    // 粗略估計勝率與聽牌 (簡化版 - 產生 0.0 ~ 1.0 的 Equity 與是否為強聽牌)
+    static estimateHand(bot, game) {
+        let equity = 0.3; // 預設空氣
+        let isStrongDraw = false;
         
-        let score = 0;
-        // Preflop basic strength (1-100 scale roughly)
-        if (high === low) {
-            score = 50 + (high * 3); // Pocket pairs: 22(56) - AA(92)
+        const allCards = [...(bot.hand || []), ...(game.communityCards || [])];
+        
+        if (game.gameState === 'pre_flop') {
+            const val = (r) => {
+                const map = {'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'T':10,'J':11,'Q':12,'K':13,'A':14};
+                return map[r] || 0;
+            };
+            const r1 = val(bot.hand[0].rank);
+            const r2 = val(bot.hand[1].rank);
+            const suited = bot.hand[0].suit === bot.hand[1].suit;
+            const high = Math.max(r1, r2);
+            const low = Math.min(r1, r2);
+            
+            // 將起手牌轉換為 0.0 ~ 1.0 的勝率估計
+            let score = 0;
+            if (high === low) score = 50 + (high * 3);
+            else {
+                score = (high * 2.5) + (low * 1.5);
+                if (suited) score += 10;
+                if (high - low === 1) score += 5;
+                else if (high - low === 2) score += 2;
+            }
+            equity = score / 100.0;
+            isStrongDraw = suited || (high - low <= 2);
         } else {
-            score = (high * 2.5) + (low * 1.5);
-            if (suited) score += 10;
-            if (high - low === 1) score += 5; // Connected
-            else if (high - low === 2) score += 2; // One gapper
+            if (allCards.length >= 5) {
+                const evalObj = game.evaluateHand(allCards);
+                // 根據 evaluateHand 粗略轉換
+                if (evalObj.score > 20000000) equity = 0.85; // Two pair+
+                else if (evalObj.score > 10000000) equity = 0.60; // Pair
+                else equity = 0.20; // High card
+            }
+            // 聽牌判斷
+            const suits = {};
+            allCards.forEach(c => { suits[c.suit] = (suits[c.suit] || 0) + 1; });
+            const maxSuit = Math.max(...Object.values(suits));
+            if (maxSuit === 4) isStrongDraw = true; // 四張同花聽牌
         }
-        return score; // Range ~10 to 95
+        
+        // 限制在 0.0 - 1.0 之間
+        equity = Math.max(0, Math.min(1, equity));
+        return { equity, isStrongDraw };
     }
 
     static decide(game, bot) {
         if (!['pre_flop', 'flop', 'turn', 'river'].includes(game.gameState) || bot.allIn || bot.folded) return {action: 'fold', amount: 0};
         
-        // Ensure bot has a personality
         if (!bot.personality) {
-            bot.personality = this.generatePersonality();
+            bot.personality = Object.assign(this.generatePersonality(), bot.personality || {});
         }
-        // 向下相容
-        if (bot.personality.posAware === undefined) Object.assign(bot.personality, { posAware: 1.0, evAware: 1.0, stackAware: 1.0 });
-        
-        const { aggression, tightness, bluffFreq, posAware, evAware, stackAware } = bot.personality;
 
+        const potSize = game.pot;
         const callAmount = game.currentBetAmount - bot.currentBet;
         const minRaise = game.currentBetAmount + game.lastRaiseAmount;
-        const pot = game.pot;
-        const activePlayers = game.activePlayersInRound.filter(id => !game.players[id].folded && !game.players[id].allIn);
-        const numActive = activePlayers.length;
         
-        // Find bot position
-        const pIdx = game.activePlayersInRound.indexOf(bot.userId);
-        const isLatePosition = pIdx >= game.activePlayersInRound.length - 2;
-        const isEarlyPosition = pIdx <= 1 && game.activePlayersInRound.length > 3;
+        const epsilon = bot.personality.epsilon !== undefined ? bot.personality.epsilon : 0.1;
+        const strongThresh = bot.personality.strongThreshold !== undefined ? bot.personality.strongThreshold : 0.65;
+        const midThresh = bot.personality.midThreshold !== undefined ? bot.personality.midThreshold : 0.40;
+        const drawBluff = bot.personality.drawBluffProb !== undefined ? bot.personality.drawBluffProb : 0.40;
+        const airBluff = bot.personality.airBluffProb !== undefined ? bot.personality.airBluffProb : 0.10;
+        
+        const { equity, isStrongDraw } = this.estimateHand(bot, game);
 
-        // SPR (Stack-to-Pot Ratio)
-        const effectiveStack = bot.chips;
-        const spr = pot > 0 ? effectiveStack / pot : 10;
-
-        let action = 'fold';
-        let amount = 0;
-        let bluffProb = 0;
+        let actionObj = { action: 'fold', amount: 0 };
         const rand = Math.random();
 
-        const handScore = this.getHandStrength(bot.hand, game.communityCards);
-        
-        // --- EV & 動態意識計算 ---
-        
-        // 1. 位置意識 (Position Awareness)
-        // 在前位需要更強的牌，在後位可以玩更鬆
-        let posModifier = 1.0;
-        if (isEarlyPosition) posModifier = 1.0 + (0.3 * posAware);
-        if (isLatePosition) posModifier = 1.0 - (0.3 * posAware);
+        // 離散化動作的輔助函數
+        const actionFold = () => ({ action: callAmount > 0 ? 'fold' : 'check', amount: 0 });
+        const actionCheckCall = () => ({ action: callAmount > 0 ? 'call' : 'check', amount: 0 });
+        const actionBet33 = () => ({ action: 'raise', amount: Math.max(minRaise, Math.floor(potSize * 0.33) + callAmount) });
+        const actionBet75 = () => ({ action: 'raise', amount: Math.max(minRaise, Math.floor(potSize * 0.75) + callAmount) });
+        const actionAllIn = () => ({ action: 'raise', amount: bot.chips + bot.currentBet });
 
-        // 2. 賠率與 EV 意識 (Pot Odds / EV Awareness)
-        // Pot Odds = 需跟注金額 / (目前底池 + 需跟注金額)
-        // 如果賠率很差 (例如對手下重注)，需要更強的牌才能繼續
-        let potOdds = callAmount > 0 ? callAmount / (pot + callAmount) : 0;
-        let oddsModifier = 1.0;
-        if (potOdds > 0.25) oddsModifier = 1.0 + (potOdds * 2.0 * evAware); 
-
-        // 3. 籌碼量意識 (Stack/SPR Awareness)
-        // 如果 SPR 很低 (已經投入大量籌碼)，會更傾向打到底 (套牢)；如果籌碼很深，打得更謹慎
-        let sprModifier = 1.0;
-        if (spr < 2.0) sprModifier = 1.0 - (0.4 * stackAware); // SPR低，降低要求(易打光)
-        if (spr > 8.0) sprModifier = 1.0 + (0.2 * stackAware); // SPR高，提高要求(謹慎)
-
-        // 綜合所有意識，調整對手牌分數的嚴謹度要求
-        const effectiveScore = (handScore / tightness) / posModifier / oddsModifier / sprModifier;
-
-        // Stage logic
-        if (game.gameState === 'pre_flop') {
-            if (effectiveScore > 80) { // Premium
-                action = 'raise';
-                amount = Math.max(minRaise, pot * (0.6 + rand * 0.4 * aggression) + callAmount);
-            } else if (effectiveScore > 65) { // Strong
-                if (callAmount === 0 || callAmount <= game.smallBlind * 4) {
-                    action = (rand * aggression > 0.4) ? 'raise' : 'call';
-                    amount = minRaise;
-                } else {
-                    action = 'call';
-                }
-            } else if (effectiveScore > 50) { // Playable
-                if (callAmount === 0 || callAmount <= game.smallBlind * 2) {
-                    action = 'call';
-                } else if (isLatePosition && callAmount === 0) {
-                    action = (rand * aggression > 0.5) ? 'raise' : 'call'; // Steal
-                    amount = minRaise;
-                } else {
-                    action = 'fold';
-                }
-            } else { // Weak
-                action = (callAmount === 0) ? 'check' : 'fold';
-                // Occasional bluff steal from late position if folded to us
-                if (isLatePosition && callAmount === 0 && numActive <= 3 && (rand * bluffFreq > 0.75)) {
-                    action = 'raise';
-                    amount = minRaise;
-                }
-            }
+        // 探索率 (Epsilon-Greedy)
+        if (Math.random() < epsilon) {
+            const actions = [actionFold, actionCheckCall, actionBet33, actionBet75, actionAllIn];
+            const randomChoice = actions[Math.floor(Math.random() * actions.length)];
+            actionObj = randomChoice();
         } else {
-            // Post-flop (simplified GTO heuristic since we can't run full solver)
-            // Just simulate hit strength. In reality, we'd need a hand evaluator for postflop.
-            // We will use a randomized strength based on preflop + community cards count to simulate hit/miss.
-            
-            // Very basic postflop pseudo-strength (0-100)
-            // If we had the real evaluateHand result, we'd use it, but evaluateHand takes 5+ cards.
-            const allCards = [...(bot.hand || []), ...(game.communityCards || [])];
-            let currentStr = handScore * 0.4; // Base retention
-            let hasHit = false;
-            let drawStrength = 0;
-
-            if (allCards.length >= 5) {
-                const evalObj = game.evaluateHand(allCards);
-                // score is large, normalize it roughly: Pair=10M, TwoPair=20M, etc.
-                if (evalObj.score > 20000000) currentStr = 85; // Two pair+
-                else if (evalObj.score > 10000000) currentStr = 60; // Pair
-                else currentStr = 20; // High card
-            }
-            
-            // Adjust current strength based on personality (aggression increases perceived strength)
-            currentStr = currentStr * (1 + (aggression - 1) * 0.2);
-
-            // Aggression logic
-            if (currentStr > 80) { // Value
-                action = 'raise';
-                let betSize = pot * (rand < 0.5 ? 0.5 : 1.0) * aggression; 
-                amount = Math.max(minRaise, Math.floor(betSize) + callAmount);
-            } else if (currentStr > 50) { // Marginal
-                if (callAmount === 0) {
-                    action = (rand * aggression > 0.6) ? 'raise' : 'check';
-                    amount = minRaise;
+            // 決策邏輯
+            if (equity > strongThresh) {
+                // 強成牌：傾向於 BET_75 或 ALL_IN
+                actionObj = (rand < 0.7) ? actionBet75() : actionAllIn();
+            } else if (equity >= midThresh && equity <= strongThresh) {
+                // 中等成牌：傾向於 CHECK/CALL
+                actionObj = actionCheckCall();
+            } else if (isStrongDraw) {
+                // 強聽牌：有一定比例進行半詐唬，其餘跟注
+                if (rand < drawBluff) {
+                    actionObj = (Math.random() < 0.5) ? actionBet75() : actionBet33();
                 } else {
-                    if (callAmount > pot * 0.5 && rand > 0.5 * tightness) action = 'fold';
-                    else action = 'call';
+                    actionObj = actionCheckCall();
                 }
-            } else { // Air / Weak
-                if (callAmount === 0) {
-                    // Bluff frequency based on position and active players
-                    bluffProb = (isLatePosition && numActive <= 2 ? 0.3 : 0.1) * bluffFreq;
-                    if (rand < bluffProb) {
-                        action = 'raise';
-                        amount = Math.max(minRaise, Math.floor(pot * 0.5 * aggression)); // Half pot bluff
-                    } else {
-                        action = 'check';
-                    }
-                } else {
-                    if (callAmount <= pot * 0.2 && rand > 0.5) action = 'call'; // Float
-                    else action = 'fold';
-                }
-            }
-        }
-
-        // Fix amount caps
-        if (action === 'raise' && bot.chips < (amount - bot.currentBet)) {
-            if (bot.chips + bot.currentBet > callAmount) {
-                action = 'raise'; // All-in essentially
-                amount = bot.chips + bot.currentBet;
             } else {
-                action = 'call';
+                // 空氣牌：高機率 FOLD，保留一定純詐唬機率
+                if (rand < airBluff) {
+                    actionObj = actionBet33();
+                } else {
+                    actionObj = actionFold();
+                }
             }
         }
-        
-        // 四捨五入下注金額至整數位
-        if (amount > 0) amount = Math.round(amount);
-        
-        // Standardize check/fold if call=0
-        if (action === 'fold' && callAmount === 0) action = 'check';
-        if (action === 'call' && callAmount === 0) action = 'check';
 
-        return { action, amount };
+        // 確保加註金額不會超過玩家籌碼
+        if (actionObj.action === 'raise' && bot.chips < (actionObj.amount - bot.currentBet)) {
+            if (bot.chips + bot.currentBet > callAmount) {
+                actionObj.action = 'raise'; // All-in essentially
+                actionObj.amount = bot.chips + bot.currentBet;
+            } else {
+                actionObj.action = 'call';
+                actionObj.amount = 0;
+            }
+        }
+
+        // 修正四捨五入
+        if (actionObj.amount > 0) actionObj.amount = Math.round(actionObj.amount);
+
+        return actionObj;
     }
 }
 module.exports = PokerBotGTO;
