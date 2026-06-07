@@ -496,18 +496,23 @@
                 await liff.init({ liffId: LIFF_ID });
                 
                 if (!liff.isLoggedIn()) {
-                    // 如果沒有登入，顯示手動登入按鈕，並阻止後續自動進房的邏輯！
+                    // 如果沒有登入，顯示手動登入按鈕
                     const loginBtn = document.getElementById('line-login-btn');
                     loginBtn.style.display = 'block';
                     document.getElementById('user-info').textContent = "請先登入 LINE";
                     
                     loginBtn.onclick = () => {
-                        let redirectUrl = window.location.origin + window.location.pathname;
-                        if (pendingRoomParam) redirectUrl += `?room=${pendingRoomParam}`;
-                        liff.login({ redirectUri: redirectUrl });
+                        try {
+                            let redirectUrl = window.location.origin + window.location.pathname;
+                            if (pendingRoomParam) redirectUrl += `?room=${pendingRoomParam}`;
+                            liff.login({ redirectUri: redirectUrl });
+                        } catch(e) {
+                            console.error("Login trigger failed", e);
+                            alert("啟動登入失敗: " + e.message);
+                        }
                     };
                     
-                    // 中斷執行，等待使用者自己點擊登入
+                    // 中斷自動進房流程，等待使用者點擊登入按鈕
                     return;
                 } else {
                     const profile = await liff.getProfile();
