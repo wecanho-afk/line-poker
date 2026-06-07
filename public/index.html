@@ -513,7 +513,15 @@
 
             // 自動加入房間邏輯
             const params = new URLSearchParams(window.location.search);
-            const roomParam = params.get('room') || params.get('gameId');
+            let roomParam = params.get('room') || params.get('gameId');
+            
+            // 處理 LIFF URL 的 liff.state 參數轉發
+            if (!roomParam && params.get('liff.state')) {
+                // liff.state 裡面會包含原始的 query 參數，例如 "?room=123"
+                const stateParams = new URLSearchParams(params.get('liff.state').replace(/^\?/, ''));
+                roomParam = stateParams.get('room') || stateParams.get('gameId');
+            }
+
             if (roomParam) {
                 document.getElementById('gameIdInput').value = roomParam;
                 if (!userAvatar) {
