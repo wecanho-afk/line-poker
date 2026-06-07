@@ -267,7 +267,10 @@
         </div>
 
         <div id="game-view" style="display: none; flex-direction: column; width: 100%; align-items: center; gap: 10px;">
-            <div style="color: #aaa; font-size: 0.8em; margin-bottom: -10px;">房號: <span id="room-id"></span></div>
+            <div style="color: #aaa; font-size: 0.8em; margin-bottom: -10px; display: flex; align-items: center; justify-content: center; gap: 10px;">
+                <span>房號: <span id="room-id"></span></span>
+                <button class="btn-blue" style="padding: 2px 8px; font-size: 0.9em; min-width: auto;" onclick="copyInviteLink()">複製邀請連結</button>
+            </div>
 
             <div id="turn-timer-display" style="color: #ff4757; font-weight: bold; font-size: 1.2em; height: 1.5em; margin-bottom: 5px;"></div>
               <div id="tournament-info-display" style="color: #f1c40f; font-weight: bold; font-size: 1em; height: 1.5em; margin-bottom: 5px; display: none;"></div>
@@ -507,6 +510,55 @@
             }
             // 無論有沒有登入成功，都初始化 Socket，才能看到遊戲
             initSocket();
+
+            // 自動加入房間邏輯
+            const params = new URLSearchParams(window.location.search);
+            const roomParam = params.get('room') || params.get('gameId');
+            if (roomParam) {
+                document.getElementById('gameIdInput').value = roomParam;
+                if (!userAvatar) {
+                    const emojis = ['👨', '👩', '🤖', '👻', '👽', '🤠', '😎', '🤓', '🤡'];
+                    userAvatar = emojis[Math.floor(Math.random() * emojis.length)];
+                }
+                if (!document.getElementById('playerNameInput').value) {
+                    document.getElementById('playerNameInput').value = userName || '玩家' + Math.floor(Math.random() * 1000);
+                }
+                // 等待一下讓UI更新完畢再加入
+                setTimeout(() => joinGame(), 500);
+            }
+        }
+
+        function copyInviteLink() {
+            let baseUrl = window.location.origin + window.location.pathname;
+            const link = `${baseUrl}?room=${gameId}`;
+            // 嘗試使用 LIFF 內建的分享，或者直接複製
+            if (liff.isInClient() && liff.isApiAvailable('shareTargetPicker')) {
+                liff.shareTargetPicker([
+                    {
+                        type: "text",
+                        text: `來打德州撲克！點擊連結自動加入房間 [${gameId}]:\n${link}`
+                    }
+                ]).then(() => {
+                    console.log("Shared successfully");
+                }).catch((error) => {
+                    console.error("Share failed", error);
+                    fallbackCopyTextToClipboard(link);
+                });
+            } else {
+                fallbackCopyTextToClipboard(link);
+            }
+        }
+
+        function fallbackCopyTextToClipboard(text) {
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(text).then(() => {
+                    alert('邀請連結已複製！快發給朋友吧\n' + text);
+                }).catch(err => {
+                    alert('複製失敗，請手動複製連結：\n' + text);
+                });
+            } else {
+                alert('您的裝置不支援自動複製，請手動複製以下連結：\n' + text);
+            }
         }
 
         async function api(path, method = 'GET', body = null) {
