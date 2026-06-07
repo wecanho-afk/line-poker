@@ -529,35 +529,66 @@
         }
 
         function copyInviteLink() {
-            let baseUrl = window.location.origin + window.location.pathname;
-            const link = `${baseUrl}?room=${gameId}`;
-            // 嘗試使用 LIFF 內建的分享，或者直接複製
-            if (liff.isInClient() && liff.isApiAvailable('shareTargetPicker')) {
-                liff.shareTargetPicker([
-                    {
-                        type: "text",
-                        text: `來打德州撲克！點擊連結自動加入房間 [${gameId}]:\n${link}`
-                    }
-                ]).then(() => {
-                    console.log("Shared successfully");
-                }).catch((error) => {
-                    console.error("Share failed", error);
+            try {
+                let baseUrl = window.location.origin + window.location.pathname;
+                const link = `${baseUrl}?room=${gameId}`;
+                // 嘗試使用 LIFF 內建的分享，或者直接複製
+                if (typeof liff !== 'undefined' && liff.isInClient() && liff.isApiAvailable('shareTargetPicker')) {
+                    liff.shareTargetPicker([
+                        {
+                            type: "text",
+                            text: `來打德州撲克！點擊連結自動加入房間 [${gameId}]:\n${link}`
+                        }
+                    ]).then(() => {
+                        console.log("Shared successfully");
+                    }).catch((error) => {
+                        console.error("Share failed", error);
+                        fallbackCopyTextToClipboard(link);
+                    });
+                } else {
                     fallbackCopyTextToClipboard(link);
-                });
-            } else {
-                fallbackCopyTextToClipboard(link);
+                }
+            } catch (e) {
+                console.error(e);
+                fallbackCopyTextToClipboard(window.location.origin + window.location.pathname + "?room=" + gameId);
             }
         }
 
         function fallbackCopyTextToClipboard(text) {
-            if (navigator.clipboard) {
-                navigator.clipboard.writeText(text).then(() => {
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        alert('邀請連結已複製！快發給朋友吧\n' + text);
+                    }).catch(err => {
+                        doLegacyCopy(text);
+                    });
+                } else {
+                    doLegacyCopy(text);
+                }
+            } catch (e) {
+                doLegacyCopy(text);
+            }
+        }
+
+        function doLegacyCopy(text) {
+            try {
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.top = "0";
+                textArea.style.left = "0";
+                textArea.style.position = "fixed";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                const successful = document.execCommand('copy');
+                document.body.removeChild(textArea);
+                if (successful) {
                     alert('邀請連結已複製！快發給朋友吧\n' + text);
-                }).catch(err => {
-                    alert('複製失敗，請手動複製連結：\n' + text);
-                });
-            } else {
-                alert('您的裝置不支援自動複製，請手動複製以下連結：\n' + text);
+                } else {
+                    alert('自動複製失敗，請手動複製以下連結：\n' + text);
+                }
+            } catch (err) {
+                alert('自動複製失敗，請手動複製以下連結：\n' + text);
             }
         }
 
