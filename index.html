@@ -481,12 +481,26 @@
 
         
         async function init() {
+            let pendingRoomParam = null;
             try {
+                // 自動加入房間邏輯：先記錄網址上的參數
+                const params = new URLSearchParams(window.location.search);
+                pendingRoomParam = params.get('room') || params.get('gameId');
+                
+                // 處理 LIFF URL 的 liff.state 參數轉發
+                if (!pendingRoomParam && params.get('liff.state')) {
+                    const stateParams = new URLSearchParams(params.get('liff.state').replace(/^\?/, ''));
+                    pendingRoomParam = stateParams.get('room') || stateParams.get('gameId');
+                }
+
                 await liff.init({ liffId: LIFF_ID });
                 if (!liff.isLoggedIn()) {
                     document.getElementById('line-login-btn').style.display = 'block'; // Show login button
                     try {
-                        liff.login({ redirectUri: window.location.href });
+                        // 登入時保留邀請參數！這樣登入回來後才會繼續進房
+                        let redirectUrl = window.location.origin + window.location.pathname;
+                        if (pendingRoomParam) redirectUrl += `?room=${pendingRoomParam}`;
+                        liff.login({ redirectUri: redirectUrl });
                         return;
                     } catch (e) {
                         console.error('liff.login() error', e);
@@ -511,27 +525,25 @@
             // 無論有沒有登入成功，都初始化 Socket，才能看到遊戲
             initSocket();
 
-            // 自動加入房間邏輯
-            const params = new URLSearchParams(window.location.search);
-            let roomParam = params.get('room') || params.get('gameId');
-            
-            // 處理 LIFF URL 的 liff.state 參數轉發
-            if (!roomParam && params.get('liff.state')) {
-                // liff.state 裡面會包含原始的 query 參數，例如 "?room=123"
-                const stateParams = new URLSearchParams(params.get('liff.state').replace(/^\?/, ''));
-                roomParam = stateParams.get('room') || stateParams.get('gameId');
-            }
-
-            if (roomParam) {
-                document.getElementById('gameIdInput').value = roomParam;
+            // 若有邀請參數，則在拿到名字/頭像後，自動加入房間
+            if (pendingRoomParam) {
+                document.getElementById('gameIdInput').value = pendingRoomParam;
+                
+                // 確保如果有 LINE 頭像就優先使用
                 if (!userAvatar) {
                     const emojis = ['👨', '👩', '🤖', '👻', '👽', '🤠', '😎', '🤓', '🤡'];
                     userAvatar = emojis[Math.floor(Math.random() * emojis.length)];
                 }
-                if (!document.getElementById('playerNameInput').value) {
-                    document.getElementById('playerNameInput').value = userName || '玩家' + Math.floor(Math.random() * 1000);
+
+                // 確保優先使用 LINE 名稱
+                const nameInput = document.getElementById('playerNameInput');
+                if (userName) {
+                    nameInput.value = userName;
+                } else if (!nameInput.value) {
+                    nameInput.value = '玩家' + Math.floor(Math.random() * 1000);
                 }
-                // 等待一下讓UI更新完畢再加入
+
+                // 自動點擊加入房間
                 setTimeout(() => joinGame(), 500);
             }
         }
