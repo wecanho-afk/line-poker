@@ -57,6 +57,38 @@ class PokerBotGTO {
         return { equity, isStrongDraw };
     }
 
+    // Analyze board texture (Wet vs Dry)
+    static analyzeBoardTexture(communityCards) {
+        if (!communityCards || communityCards.length < 3) {
+            return { isWet: false, wetnessScore: 0 };
+        }
+        
+        let wetness = 0;
+        const suits = {};
+        const ranks = [];
+        
+        communityCards.forEach(c => {
+            suits[c.suit] = (suits[c.suit] || 0) + 1;
+            const rankVal = {'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'T':10,'J':11,'Q':12,'K':13,'A':14}[c.rank] || 0;
+            ranks.push(rankVal);
+        });
+        
+        const maxSuit = Math.max(...Object.values(suits), 0);
+        if (maxSuit === 2) wetness += 3; // Flush draw possible
+        if (maxSuit >= 3) wetness += 5; // Flush possible
+        
+        ranks.sort((a, b) => a - b);
+        let connectedCount = 1;
+        for (let i = 1; i < ranks.length; i++) {
+            const diff = ranks[i] - ranks[i-1];
+            if (diff === 1) connectedCount++;
+        }
+        if (connectedCount >= 2) wetness += 2;
+        if (connectedCount >= 3) wetness += 4; // Straight draw possible
+        
+        return { isWet: wetness >= 4, wetnessScore: wetness };
+    }
+
     // Calculate Pot Odds
     static calculatePotOdds(potSize, callAmount) {
         if (callAmount <= 0) return 0.0;
@@ -73,19 +105,62 @@ class PokerBotGTO {
             bot.personality = Object.assign(this.generatePersonality(), bot.personality || {});
         }
 
+        // --- Track Opponents (Simple Heuristics) ---
+        bot.personality.opponentProfile = bot.personality.opponentProfile || {};
+        let activePlayers = game.activePlayersInRound || [];
+        
+        // Track VPIP/Aggression loosely by observing active players pre-flop
+        if (game.gameState === 'pre_flop') {
+            activePlayers.forEach(pid => {
+                if (pid !== bot.id) {
+                    if (!bot.personality.opponentProfile[pid]) {
+                        bot.personality.opponentProfile[pid] = { handsSeen: 0, actions: 0, raises: 0 };
+                    }
+                    // If they are not folded, they are taking actions
+                    const p = game.players[pid];
+                    if (p && !p.folded && p.currentBet > 0) {
+                        bot.personality.opponentProfile[pid].actions += 0.5; // Roughly track looseness
+                    }
+                }
+            });
+        }
+
         const potSize = game.pot;
         const callAmount = game.currentBetAmount - bot.currentBet;
         const minRaise = game.currentBetAmount + game.lastRaiseAmount;
         const bb = (game.blinds && game.blinds.big) ? game.blinds.big : 20;
-        const my_bb = (bot.chips + bot.currentBet) / bb;
+        const sb = (game.blinds && game.blinds.small) ? game.blinds.small : 10;
+        const mRatio = (bot.chips + bot.currentBet) / (sb + bb);
+
+        // Board Texture Analysis (Post-flop)
+        const board = this.analyzeBoardTexture(game.communityCards);
 
         // Position evaluation: 0.0 (Early) to 1.0 (Late)
-        let activePlayers = game.activePlayersInRound || [];
         let positionValue = 0.5; // Default middle
         if (activePlayers.length > 1) {
             let myIndex = activePlayers.indexOf(bot.id);
             if (myIndex !== -1) {
                 positionValue = myIndex / (activePlayers.length - 1);
+            }
+        }
+
+        // --- Opponent Exploitation Analysis ---
+        let facingAggressorId = null;
+        let isFacingCallingStation = false;
+        let isFacingRock = false;
+
+        if (callAmount > 0) {
+            // Find who raised/bet
+            for (const [pid, player] of Object.entries(game.players)) {
+                if (player.currentBet === game.currentBetAmount && pid !== bot.id) {
+                    facingAggressorId = pid;
+                    break;
+                }
+            }
+            if (facingAggressorId && bot.personality.opponentProfile[facingAggressorId]) {
+                const profile = bot.personality.opponentProfile[facingAggressorId];
+                if (profile.actions > 15) isFacingCallingStation = true; // Very loose
+                if (profile.actions < 3 && bot.personality.handsPlayed > 10) isFacingRock = true; // Very tight
             }
         }
 
@@ -95,6 +170,21 @@ class PokerBotGTO {
 
         let { equity, isStrongDraw } = this.estimateHand(bot, game);
         let adjustedEquity = equity;
+
+        // --- High-Level: Nut Blocker Detection ---
+        let hasNutBlocker = false;
+        if (game.gameState !== 'pre_flop' && game.communityCards && game.communityCards.length >= 3) {
+            const boardSuits = {};
+            game.communityCards.forEach(c => { boardSuits[c.suit] = (boardSuits[c.suit] || 0) + 1; });
+            for (const suit in boardSuits) {
+                if (boardSuits[suit] >= 3) {
+                    // Check if we hold the Ace of this suit, but we don't actually have the flush
+                    const hasAceOfSuit = bot.hand.some(c => c.rank === 'A' && c.suit === suit);
+                    const hasFlush = bot.hand.filter(c => c.suit === suit).length + boardSuits[suit] >= 5;
+                    if (hasAceOfSuit && !hasFlush) hasNutBlocker = true;
+                }
+            }
+        }
 
         // Pot odds
         const potOdds = this.calculatePotOdds(potSize, callAmount);
@@ -116,12 +206,14 @@ class PokerBotGTO {
             return this.finalizeAction(actionObj, callAmount, minRaise, bot);
         }
 
-        // 2. Short Stack Push/Fold Mode (< 15 BB)
-        if (my_bb < 15) {
+        // 2. Tournament Survival: M-Ratio & Push/Fold Phase
+        if (mRatio < 10) {
+            // Push/Fold phase: Only All-in or Fold
             let pushThreshold = 0.55;
+            if (mRatio <= 5) pushThreshold = 0.40; // Desperation phase (Dead Zone)
             pushThreshold -= (positionValue * 0.1); // Looser in late position
             
-            if (adjustedEquity > pushThreshold || (isStrongDraw && positionValue > 0.7)) {
+            if (adjustedEquity > pushThreshold || (isStrongDraw && positionValue > 0.6)) {
                 actionObj = actionAllIn();
             } else {
                 actionObj = actionFold();
@@ -142,10 +234,16 @@ class PokerBotGTO {
 
         // --- B. Reacting to Bets (Curing the Calling Station) ---
         if (callAmount > 0) {
+            // Exploit: If facing a Rock (very tight player), respect their raises!
+            if (isFacingRock && adjustedEquity < 0.70) {
+                return this.finalizeAction(actionFold(), callAmount, minRaise, bot); // Fold unless we have a monster
+            }
+
             // MUST meet pot odds, unless drawing!
             if (adjustedEquity < potOdds && !isStrongDraw) {
-                // 5% chance to bluff raise if deep
-                if (Math.random() < 0.05 && my_bb > 30) {
+                // 5% chance to bluff raise if deep (M > 20)
+                // Exploit: DO NOT bluff Calling Stations
+                if (!isFacingCallingStation && Math.random() < 0.05 && mRatio > 20) {
                     actionObj = actionBet33();
                 } else {
                     actionObj = actionFold();
@@ -154,25 +252,68 @@ class PokerBotGTO {
             }
         }
 
-        // --- C. Value Betting and Bluffs ---
+        // --- C. Value Betting, Bluffs, and High-Level Deception ---
+        
+        // High-Level: Trapping (Slowplaying)
+        let isTrapping = false;
+        if (adjustedEquity > 0.85 && !board.isWet && game.gameState !== 'river') {
+            // 25% chance to set a trap with an absolute monster on a safe board
+            if (Math.random() < 0.25) isTrapping = true;
+        }
+
         if (adjustedEquity > 0.75) {
             // Monster hand
-            actionObj = (potSize > bot.chips) ? actionAllIn() : actionBet75();
+            if (isTrapping) {
+                actionObj = actionCheckCall(); // SLOWPLAY: Just call or check
+            } else if (board.isWet && game.gameState !== 'river') {
+                actionObj = (potSize * 1.5 > bot.chips) ? actionAllIn() : actionBet75();
+            } else {
+                // Mix in Overbets (1.2x pot) on the river to look polar
+                if (game.gameState === 'river' && Math.random() < 0.3) {
+                    actionObj = (potSize * 1.5 > bot.chips) ? actionAllIn() : { action: 'raise', amount: Math.max(minRaise, Math.floor(potSize * 1.2) + callAmount) };
+                } else if (isFacingCallingStation || activePlayers.length > 2) {
+                    // Exploit: If against a calling station, just bet huge for value!
+                    actionObj = (potSize > bot.chips) ? actionAllIn() : { action: 'raise', amount: Math.max(minRaise, potSize + callAmount) }; // Pot size bet
+                } else {
+                    actionObj = (potSize > bot.chips) ? actionAllIn() : actionBet75();
+                }
+            }
         } else if (adjustedEquity > 0.60) {
             // Good hand
-            actionObj = (positionValue > 0.5) ? actionBet75() : actionCheckCall();
-        } else if (isStrongDraw) {
-            // Semi-bluff
-            if (potOdds > 0.35) { // Too expensive to draw
+            if (board.isWet) {
+                actionObj = actionBet75();
+            } else {
+                actionObj = (positionValue > 0.5) ? actionBet33() : actionCheckCall();
+            }
+        } else if (isStrongDraw || hasNutBlocker) {
+            // Semi-bluff OR Nut-Blocker Bluff
+            if (potOdds > 0.35 && !hasNutBlocker) { // Too expensive to draw, but blockers can still bluff
                 actionObj = actionFold();
             } else {
-                actionObj = (Math.random() < 0.4) ? actionBet75() : actionCheckCall();
+                // Exploit: Do not bluff calling stations, they won't fold anyway
+                if (isFacingCallingStation) {
+                    actionObj = actionCheckCall();
+                } else {
+                    let bluffProb = board.isWet ? 0.6 : 0.3;
+                    if (hasNutBlocker && game.gameState === 'river') bluffProb = 0.8; // Huge bluff frequency on river with a nut blocker
+                    
+                    if (Math.random() < bluffProb) {
+                        // High-Level: Nut blocker bluffs should be large to represent the nuts
+                        actionObj = hasNutBlocker ? { action: 'raise', amount: Math.max(minRaise, potSize + callAmount) } : actionBet75();
+                    } else {
+                        actionObj = actionCheckCall();
+                    }
+                }
             }
         } else {
             // Weak hand / Air
             if (callAmount === 0) {
                 // Positional bluff
+                // Exploit: Bluff Rocks aggressively, but never bluff Calling Stations
                 let bluffProb = 0.1 + (positionValue * 0.15);
+                if (isFacingRock) bluffProb += 0.3; // Steal more from tight players
+                if (isFacingCallingStation) bluffProb = 0; // Give up
+                
                 actionObj = (Math.random() < bluffProb) ? actionBet33() : actionCheckCall();
             } else {
                 actionObj = actionFold();
