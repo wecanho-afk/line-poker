@@ -530,8 +530,11 @@
 
         function copyInviteLink() {
             try {
-                let baseUrl = window.location.origin + window.location.pathname;
-                const link = `${baseUrl}?room=${gameId}`;
+                // 使用 LIFF 專屬網址，這樣朋友在 LINE 點開才會「無縫登入」抓到頭像！
+                const link = LIFF_ID 
+                    ? `https://liff.line.me/${LIFF_ID}?room=${gameId}` 
+                    : `${window.location.origin + window.location.pathname}?room=${gameId}`;
+                
                 // 嘗試使用 LIFF 內建的分享，或者直接複製
                 if (typeof liff !== 'undefined' && liff.isInClient() && liff.isApiAvailable('shareTargetPicker')) {
                     liff.shareTargetPicker([
@@ -550,7 +553,8 @@
                 }
             } catch (e) {
                 console.error(e);
-                fallbackCopyTextToClipboard(window.location.origin + window.location.pathname + "?room=" + gameId);
+                const fallbackLink = LIFF_ID ? `https://liff.line.me/${LIFF_ID}?room=${gameId}` : window.location.origin + window.location.pathname + "?room=" + gameId;
+                fallbackCopyTextToClipboard(fallbackLink);
             }
         }
 
