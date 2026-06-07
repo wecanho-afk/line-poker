@@ -515,6 +515,12 @@
                 }
             } catch (err) {
                 console.error('LIFF Init Error', err);
+                
+                // 如果是在有帶邀請碼的情況下發生錯誤，跳出提示讓開發者知道發生了什麼事
+                if (pendingRoomParam) {
+                    alert('⚠️ LINE 授權連線失敗\n\n原因：' + err.message + '\n\n💡 開發者提示：這通常是因為您部署了新的 Render 網址，但還沒有去 LINE Developer Console 把 LIFF 的 Endpoint URL 更新成新的網址！\n\n(系統將暫時為您分配匿名身分進入遊戲)');
+                }
+
                 // LIFF 失敗，或者在 LINE App 內但不知為何拿不到資料，給個隨機 ID 以防遊戲卡死
                 if (!userId) userId = 'web_user_' + Math.floor(Math.random() * 10000);
                 if (!userName) userName = '';
