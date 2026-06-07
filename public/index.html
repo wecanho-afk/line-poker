@@ -483,28 +483,32 @@
         async function init() {
             let pendingRoomParam = null;
             try {
-                // 自動加入房間邏輯：先記錄網址上的參數
                 const params = new URLSearchParams(window.location.search);
                 pendingRoomParam = params.get('room') || params.get('gameId');
                 
-                // 處理 LIFF URL 的 liff.state 參數轉發
+                // 處理 LIFF URL 的 liff.state 參數轉發 (加上 decodeURIComponent 防止編碼問題)
                 if (!pendingRoomParam && params.get('liff.state')) {
-                    const stateParams = new URLSearchParams(params.get('liff.state').replace(/^\?/, ''));
+                    const stateStr = decodeURIComponent(params.get('liff.state')).replace(/^\?/, '');
+                    const stateParams = new URLSearchParams(stateStr);
                     pendingRoomParam = stateParams.get('room') || stateParams.get('gameId');
                 }
 
                 await liff.init({ liffId: LIFF_ID });
+                
                 if (!liff.isLoggedIn()) {
-                    document.getElementById('line-login-btn').style.display = 'block'; // Show login button
-                    try {
-                        // 登入時保留邀請參數！這樣登入回來後才會繼續進房
+                    // 如果沒有登入，顯示手動登入按鈕，並阻止後續自動進房的邏輯！
+                    const loginBtn = document.getElementById('line-login-btn');
+                    loginBtn.style.display = 'block';
+                    document.getElementById('user-info').textContent = "請先登入 LINE";
+                    
+                    loginBtn.onclick = () => {
                         let redirectUrl = window.location.origin + window.location.pathname;
                         if (pendingRoomParam) redirectUrl += `?room=${pendingRoomParam}`;
                         liff.login({ redirectUri: redirectUrl });
-                        return;
-                    } catch (e) {
-                        console.error('liff.login() error', e);
-                    }
+                    };
+                    
+                    // 中斷執行，等待使用者自己點擊登入
+                    return;
                 } else {
                     const profile = await liff.getProfile();
                     userId = profile.userId;
@@ -512,20 +516,20 @@
                     userAvatar = profile.pictureUrl || '';
                     document.getElementById('user-info').textContent = userName;
                     if(document.getElementById('playerNameInput')) document.getElementById('playerNameInput').value = userName;
+                    document.getElementById('line-login-btn').style.display = 'none';
                 }
             } catch (err) {
                 console.error('LIFF Init Error', err);
-                // 忽略 LIFF Init 錯誤中的自動跳出提示，避免給朋友看到錯誤碼
                 if (!userId) userId = 'web_user_' + Math.floor(Math.random() * 10000);
                 if (!userName) userName = '';
-                document.getElementById('line-login-btn').style.display = 'none';
-                document.getElementById('user-info').textContent = userName ? userName : "未登入";
+                document.getElementById('user-info').textContent = "訪客模式";
                 if(document.getElementById('playerNameInput')) document.getElementById('playerNameInput').value = userName;
             }
+            
             // 無論有沒有登入成功，都初始化 Socket，才能看到遊戲
             initSocket();
 
-            // 若有邀請參數，則在拿到名字/頭像後，自動加入房間
+            // 若有邀請參數，且已經拿到頭像與名稱，則自動加入房間
             if (pendingRoomParam) {
                 document.getElementById('gameIdInput').value = pendingRoomParam;
                 
@@ -550,8 +554,10 @@
 
         function copyInviteLink() {
             try {
-                // 強制改用一般網址分享，因為 liff.line.me 的參數傳遞在不同版本的 LINE App 會有快取問題
-                const link = `${window.location.origin + window.location.pathname}?room=${gameId}`;
+                // 恢復使用 LIFF 專屬網址，這樣才能做到無縫登入
+                const link = LIFF_ID 
+                    ? `https://liff.line.me/${LIFF_ID}?room=${gameId}` 
+                    : `${window.location.origin + window.location.pathname}?room=${gameId}`;
                 
                 // 嘗試使用 LIFF 內建的分享，或者直接複製
                 if (typeof liff !== 'undefined' && liff.isInClient() && liff.isApiAvailable('shareTargetPicker')) {
