@@ -525,6 +525,7 @@
                 }
             } catch (err) {
                 console.error('LIFF Init Error', err);
+                alert("LIFF Error: " + (err.message || JSON.stringify(err)));
                 if (!userId) userId = 'web_user_' + Math.floor(Math.random() * 10000);
                 if (!userName) userName = '';
                 document.getElementById('user-info').textContent = "訪客模式";
