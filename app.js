@@ -1,4 +1,6 @@
 const PokerBotGTO = require('./bot_gto');
+const history = require('./hand-history');
+const practice = require('./practice');
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -21,7 +23,13 @@ const broadcastState = (gameId) => {
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static('.'));
+app.use(express.static(path.join(__dirname, 'public')));
+app.use((req, res, next) => {
+    const game = GAMES[req.body?.game_id];
+    const player = game?.players[req.body?.user_id];
+    if (player?.historyKey && player.historyKey !== req.get('X-History-Key')) return res.status(403).json({ success: false, message: '座位驗證失敗，請使用原本的瀏覽器' });
+    next();
+});
 
 // --- Poker Logic ---
 
@@ -242,6 +250,7 @@ class TexasHoldemGame {
         
         if (['pre_flop', 'flop', 'turn', 'river'].includes(this.gameState)) {
             if (!p.folded && !p.allIn) {
+                history.record(this, history.capture(this, p, 'fold', 0));
                 // To avoid bugs, we just fold the disconnected player immediately
                 p.folded = true;
                 this.messages.push(`${p.name} 因斷線自動蓋牌`);
@@ -320,7 +329,7 @@ class TexasHoldemGame {
         const botName = botNames[this.playersOrder.length % botNames.length];
         const botAvatar = botAvatars[this.playersOrder.length % botAvatars.length];
         const [ok, msg] = this.addPlayer(botId, botName, botAvatar);
-        if (ok) this.players[botId].isBot = true;
+        if (ok) { this.players[botId].isBot = true; this.players[botId].personality = PokerBotGTO.personality(); }
         return [ok, msg];
     }
 
@@ -396,6 +405,9 @@ class TexasHoldemGame {
             });
         }
 
+        history.begin(this);
+        this.activePlayersInRound.forEach(id => { if (this.players[id].personality) this.players[id].personality.handsPlayed++; });
+
         // Post Blinds
         this.postBlind(this.players[this.smallBlindId], this.blinds.small);
         this.postBlind(this.players[this.bigBlindId], this.blinds.big);
@@ -406,7 +418,7 @@ class TexasHoldemGame {
 
         // Pre-flop: Action starts left of BB (UTG)
         this.currentPlayerIdx = this.activePlayersInRound.indexOf(this.bigBlindId);
-        this.moveToNextPlayer();
+        if (!this.moveToNextPlayer()) { this.endBettingRound(); return; }
 
         this.messages.push(`現在輪到 ${this.getCurrentPlayer().name} 行動。`);
         this.startTurnTimer();
@@ -450,6 +462,8 @@ class TexasHoldemGame {
     }
 
     endRoundSingleWinner() {
+        if (this.turnTimeout) clearTimeout(this.turnTimeout);
+        this.turnDeadline = 0;
         const winnerId = this.activePlayersInRound.find(id => !this.players[id].folded);
         const winner = this.players[winnerId];
         winner.chips += this.pot;
@@ -459,6 +473,7 @@ class TexasHoldemGame {
         this.actionCount++;
         this.latestVoice = 'winner';
         this.gameState = 'showdown';
+        history.finish(this);
         
         broadcastState(this.gameId);
         setTimeout(() => { this.prepareNext(); broadcastState(this.gameId); }, 4000);
@@ -531,12 +546,17 @@ class TexasHoldemGame {
     }
 
     playerAction(userId, action, amount = 0) {
-        if (userId !== this.getCurrentPlayer().userId) return [false, "不輪到你"];
+        if (!['pre_flop', 'flop', 'turn', 'river'].includes(this.gameState) || !this.getCurrentPlayer() || userId !== this.getCurrentPlayer().userId) return [false, '不輪到你'];
         const player = this.players[userId];
         let success = false;
         let msg = "";
 
-        player.hasActed = true;
+        if (player.folded || player.allIn || player.sittingOut) return [false, '目前無法行動'];
+        if (!['fold', 'check', 'call', 'raise'].includes(action)) return [false, '無效操作'];
+        if (action === 'raise' && (!Number.isSafeInteger(amount) || amount <= this.currentBetAmount)) return [false, '加注總額必須為有效整數且高於目前下注'];
+        if (action === 'raise' && player.hasActed && this.currentBetAmount - (player.actedAtBet || 0) < this.lastRaiseAmount) return [false, '不足額全下尚未重新開放加注'];
+        if (action === 'raise' && !this.activePlayersInRound.some(id => id !== userId && this.players[id].canBet())) return [false, '沒有可跟注的對手'];
+        const event = history.capture(this, player, action, amount);
 
         if (action === 'fold') {
             player.folded = true;
@@ -582,11 +602,15 @@ class TexasHoldemGame {
 
             // Everyone else needs to act again to match the new bet
             this.activePlayersInRound.forEach(id => {
-                if (id !== userId) this.players[id].hasActed = false;
+                if (id !== userId && actualRaise >= this.lastRaiseAmount) this.players[id].hasActed = false;
             });
         }
 
         if (success) {
+            if (this.turnTimeout) { clearTimeout(this.turnTimeout); this.turnTimeout = null; }
+            player.hasActed = true;
+            player.actedAtBet = this.currentBetAmount;
+            history.record(this, event);
             player.lastAction = action;
             this.actionCount++;
             this.latestVoice = player.allIn ? 'all in' : action;
@@ -617,6 +641,11 @@ class TexasHoldemGame {
         
         const currentPlayer = this.getCurrentPlayer();
         if (!currentPlayer) return;
+        if (this.practice && !currentPlayer.isBot) {
+            this.turnDeadline = 0;
+            broadcastState(this.gameId);
+            return;
+        }
 
         if (currentPlayer.isBot) {
             this.turnDeadline = Date.now() + 3000;
@@ -768,6 +797,8 @@ class TexasHoldemGame {
     }
 
     determineWinner() {
+        if (this.turnTimeout) clearTimeout(this.turnTimeout);
+        this.turnDeadline = 0;
         const investors = Object.values(this.players).filter(p => (p.invested || 0) > 0);
         const uniqueInvestments = [...new Set(investors.map(p => p.invested))].sort((a, b) => a - b);
         let previousInvested = 0;
@@ -810,8 +841,10 @@ class TexasHoldemGame {
             }
             const potWinners = pot.eligiblePlayers.filter(p => playerScores.get(p).score === maxScore);
             const share = Math.floor(pot.amount / potWinners.length);
+            let remainder = pot.amount % potWinners.length;
+            potWinners.sort((a,b) => ((this.playersOrder.indexOf(a.userId)-this.dealerPos-1+this.playersOrder.length)%this.playersOrder.length)-((this.playersOrder.indexOf(b.userId)-this.dealerPos-1+this.playersOrder.length)%this.playersOrder.length));
             potWinners.forEach(w => {
-                winnings.set(w, (winnings.get(w) || 0) + share);
+                winnings.set(w, (winnings.get(w) || 0) + share + (remainder-- > 0 ? 1 : 0));
                 if (!winnersList.includes(w)) winnersList.push(w);
             });
         }
@@ -826,6 +859,7 @@ class TexasHoldemGame {
         this.messages.push(`結算: ${winnerMessages.join(', ')}`);
 
         this.gameState = 'showdown';
+        history.finish(this);
         this.actionCount++;
         this.latestVoice = 'winner';
         
@@ -881,6 +915,10 @@ class TexasHoldemGame {
     toJSON(userId) {
         return {
             viewer_id: userId,
+            hand_number: this.handNumber || 0,
+            blinds: this.blinds,
+            history_error: this.historyError || false,
+            practice: this.practice ? { id: this.practice.id, title: this.practice.title, prompt: this.practice.prompt, lesson: this.currentHand?.finished ? this.practice.lesson : null } : null,
             game_id: this.gameId,
             game_mode: this.gameMode,
             game_state: this.gameState,
@@ -908,9 +946,11 @@ class TexasHoldemGame {
             bb_id: this.bigBlindId,
             players: this.playersOrder.map(id => {
                 const p = this.players[id];
-                const showCards = p.userId === userId || this.gameState === 'showdown';
+                const showCards = p.userId === userId || (this.gameState === 'showdown' && !p.folded && this.activePlayersInRound.length > 1);
                 return {
                     user_id: p.userId,
+                    bot_style: p.isBot ? p.personality?.label : null,
+                    can_raise: !p.hasActed || this.currentBetAmount - (p.actedAtBet || 0) >= this.lastRaiseAmount,
                     name: p.name,
                     avatar: p.avatar,
                     chips: p.chips,
@@ -935,6 +975,7 @@ app.post('/create_game', (req, res) => {
     const chips = parseInt(initial_chips) || 1000;
     const gameId = Math.random().toString(36).substr(2, 8).toUpperCase();
     GAMES[gameId] = new TexasHoldemGame(gameId, user_id, user_name, chips, game_mode || "cash", parseInt(small_blind) || 10, parseInt(blind_duration) || 600, parseInt(max_re_entry) ?? 2);
+    GAMES[gameId].players[user_id].historyKey = req.get('X-History-Key') || '';
     if (avatar) GAMES[gameId].players[user_id].avatar = avatar;
     res.json({ success: true, game_id: gameId, game_state: GAMES[gameId].toJSON(user_id) });
     broadcastState(gameId);
@@ -945,12 +986,14 @@ app.post('/join_game', (req, res) => {
     const game = GAMES[game_id];
     if (!game) return res.status(404).json({ success: false, message: "房號不存在" });
     if (game.players[user_id]) {
+        if (game.players[user_id].historyKey && game.players[user_id].historyKey !== req.get('X-History-Key')) return res.status(403).json({ success: false, message: '請使用原本的瀏覽器加入此座位' });
         // Already in game, just allow reconnect
         game.players[user_id].name = user_name || game.players[user_id].name;
         if (avatar) game.players[user_id].avatar = avatar;
         return res.json({ success: true, message: "重新連線", game_state: game.toJSON(user_id) });
     }
     const [ok, msg] = game.addPlayer(user_id, user_name, avatar);
+    if (ok) game.players[user_id].historyKey = req.get('X-History-Key') || '';
     res.json({ success: ok, message: msg, game_state: game.toJSON(user_id) });
     broadcastState(game_id);
 });
@@ -1003,6 +1046,7 @@ app.post('/rebuy', (req, res) => {
 app.post('/start_game', (req, res) => {
     const { game_id, user_id } = req.body;
     const game = GAMES[game_id];
+    if (!game) return res.status(404).json({ success: false, message: '房號不存在' });
     if (game.playersOrder[0] !== user_id) return res.status(403).json({ success: false, message: "限房主開始" });
     const [ok, msg] = game.startGame();
     res.json({ success: ok, message: msg, game_state: game.toJSON(user_id) });
@@ -1024,7 +1068,25 @@ app.get('/get_game_state/:game_id/:user_id', (req, res) => {
     const { game_id, user_id } = req.params;
     const game = GAMES[game_id];
     if (!game) return res.status(404).json({ success: false });
+    const player = game.players[user_id];
+    if (player?.historyKey && player.historyKey !== req.get('X-History-Key')) return res.status(403).json({ success: false });
     res.json({ success: true, game_state: game.toJSON(user_id) });
+});
+
+app.get('/hand_history/:user_id', (req, res) => {
+    const key = req.get('X-History-Key');
+    if (!key || key.length < 16) return res.status(403).json({ success: false });
+    res.json({ success: true, hands: history.read(req.params.user_id + ':' + key) });
+});
+app.get('/practice_scenarios', (req, res) => res.json({ success: true, scenarios: practice.scenarios.map(({id,title,category,difficulty,prompt}) => ({id,title,category,difficulty,prompt})) }));
+app.post('/practice_start', (req, res) => {
+    const scene = practice.scenarios.find(s => s.id === req.body.scenario_id);
+    if (!scene || !req.body.user_id) return res.status(400).json({ success: false, message: '無效練習場景' });
+    const id = 'P' + require('crypto').randomBytes(5).toString('hex').toUpperCase();
+    const game = new TexasHoldemGame(id, req.body.user_id, req.body.user_name || '練習玩家', 10000, 'cash', 50);
+    game.players[req.body.user_id].historyKey = req.get('X-History-Key') || '';
+    GAMES[id] = game; practice.setup(game, scene, Card, Deck);
+    res.json({ success: true, game_id: id, game_state: game.toJSON(req.body.user_id) });
 });
 
 app.get('/', (req, res) => {
@@ -1033,7 +1095,9 @@ app.get('/', (req, res) => {
 
 
 io.on('connection', socket => {
-    socket.on('join_room', ({ game_id, user_id }) => {
+    socket.on('join_room', ({ game_id, user_id, history_key }) => {
+        const player = GAMES[game_id]?.players[user_id];
+        if (!player || (player.historyKey && player.historyKey !== history_key)) return;
         socket.join(game_id);
         socket.join(user_id); // 【修復】讓每個玩家也加入以自己 ID 命名的房間，用來接收私人手牌
         socket.userId = user_id;
@@ -1072,4 +1136,4 @@ if (!process.env.NO_SERVER) {
     server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 }
 
-module.exports = { TexasHoldemGame, Card, Deck, GAMES, broadcastState, server, io };
+module.exports = { app, TexasHoldemGame, Card, Deck, GAMES, broadcastState, server, io };

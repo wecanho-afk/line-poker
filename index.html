@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-Hant">
 <head>
     <title>W撲克 - 德州撲克</title>
     <meta charset="utf-8">
@@ -195,6 +195,7 @@
         .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); align-items: center; justify-content: center; }
         .modal-content { background: #333; padding: 25px; border-radius: 10px; text-align: center; max-width: 80%; }
     </style>
+<link rel="stylesheet" href="/poker-pro.css">
 </head>
 <body>
     <div class="header">
@@ -210,7 +211,9 @@
         </div>
     </div>
 
+    <nav class="pro-nav" aria-label="主導覽"><button data-pro-view="table" aria-pressed="true">牌桌</button><button data-pro-view="history" aria-pressed="false">手牌回顧</button><button data-pro-view="practice" aria-pressed="false">場景練習</button></nav>
     <div class="container">
+        <section id="pro-panel" class="workspace-panel" hidden></section>
         <div id="setup-view" class="card-box" style="text-align: center;">
             <h2>歡迎來到牌桌</h2>
             <div style="margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; align-items: center;">
@@ -276,6 +279,10 @@
               <div id="tournament-info-display" style="color: #f1c40f; font-weight: bold; font-size: 1em; height: 1.5em; margin-bottom: 5px; display: none;"></div>
 
             
+            <div id="table-meta" class="table-meta"></div>
+            <div id="practice-context" hidden></div>
+            <button class="btn-gold" id="repeat-practice" hidden>再練一次</button>
+            <button class="btn-blue" id="lobby-return" hidden>返回大廳</button>
             <div class="poker-table" id="poker-table">
                 <!-- Pot Area -->
                 <div class="pot-area">
@@ -368,7 +375,7 @@
             socket = io(BACKEND_URL);
             socket.on('connect', () => {
                 if (gameId && userId) {
-                    socket.emit('join_room', { game_id: gameId, user_id: userId });
+                    socket.emit('join_room', { game_id: gameId, user_id: userId, history_key: historyKey });
                     // 如果斷線重連，主動要一次最新狀態
                     api(`/get_game_state/${gameId}/${userId}`).then(res => {
                         if(res.success) updateUI(res.game_state);
@@ -513,7 +520,8 @@
                     };
                     
                     // 中斷自動進房流程，等待使用者點擊登入按鈕
-                    return;
+                    userId = 'web_' + historyKey;
+                    document.getElementById('user-info').textContent = '訪客模式 · 可選擇 LINE 登入';
                 } else {
                     const profile = await liff.getProfile();
                     userId = profile.userId;
@@ -525,8 +533,8 @@
                 }
             } catch (err) {
                 console.error('LIFF Init Error', err);
-                alert("LIFF Error: " + (err.message || JSON.stringify(err)));
-                if (!userId) userId = 'web_user_' + Math.floor(Math.random() * 10000);
+                // Allow standalone browser practice when LINE is unavailable.
+                if (!userId) userId = 'web_' + historyKey;
                 if (!userName) userName = '';
                 document.getElementById('user-info').textContent = "訪客模式";
                 if(document.getElementById('playerNameInput')) document.getElementById('playerNameInput').value = userName;
@@ -628,7 +636,7 @@
         async function api(path, method = 'GET', body = null) {
             const options = {
                 method,
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 'Content-Type': 'application/json', 'X-History-Key': historyKey }
             };
             if (body) options.body = JSON.stringify(body);
             const res = await fetch(`${BACKEND_URL}${path}`, options);
@@ -655,7 +663,7 @@
             if (res.success) {
                 gameId = res.game_id;
                 isHost = true;
-                if(socket) socket.emit('join_room', { game_id: gameId, user_id: userId });
+                if(socket) socket.emit('join_room', { game_id: gameId, user_id: userId, history_key: historyKey });
                 showGame();
                 updateUI(res.game_state);
             }
@@ -671,7 +679,7 @@
             const res = await api('/join_game', 'POST', { game_id: inputId, user_id: userId, user_name: customName, avatar: userAvatar });
             if (res.success) {
                 gameId = inputId;
-                if(socket) socket.emit('join_room', { game_id: gameId, user_id: userId });
+                if(socket) socket.emit('join_room', { game_id: gameId, user_id: userId, history_key: historyKey });
                 showGame();
                 updateUI(res.game_state);
             } else {
@@ -680,7 +688,7 @@
         }
 
         async function addBot() {
-            const res = await api('/add_bot', 'POST', { game_id: gameId, user_id: userId });
+            const res = await api('/add_bot', 'POST', { game_id: gameId, user_id: userId, history_key: historyKey });
             if (res.success) updateUI(res.game_state);
             else alert(res.message);
         }
@@ -706,7 +714,7 @@
         }
 
         async function startGame() {
-            const res = await api('/start_game', 'POST', { game_id: gameId, user_id: userId });
+            const res = await api('/start_game', 'POST', { game_id: gameId, user_id: userId, history_key: historyKey });
             if (res.success) updateUI(res.game_state);
         }
 
@@ -722,7 +730,7 @@
             if (fraction === 'allin') {
                 amount = myChips + myCurrentBet;
             } else {
-                amount = currentBet + Math.floor(pot * fraction);
+                amount = currentBet + Math.floor((pot + Math.max(0, currentBet - myCurrentBet)) * fraction);
             }
             
             // Constrain
@@ -730,7 +738,7 @@
             if (amount > myChips + myCurrentBet) amount = myChips + myCurrentBet;
             
             document.getElementById('raiseAmount').value = amount;
-            performAction('raise');
+            document.getElementById('raiseAmount').focus();
         }
 
         async function performAction(action) {
@@ -752,6 +760,7 @@
                 amount: amount
             });
             if (res.success) updateUI(res.game_state);
+            else alert(res.message || '操作未成功');
         }
 
         let knownCommunityCards = [];
@@ -879,9 +888,9 @@
 
                 let avatarHtml = '👤';
                 if (p.avatar && p.avatar.startsWith('http')) {
-                    avatarHtml = `<img src="${p.avatar}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`;
+                    avatarHtml = `<img src="${escapeHTML(p.avatar)}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`;
                 } else if (p.avatar) {
-                    avatarHtml = p.avatar; // emoji avatar
+                    avatarHtml = escapeHTML(p.avatar); // emoji avatar
                 } else if (p.name.includes('Bot')) {
                     avatarHtml = '🤖';
                 }
@@ -903,7 +912,8 @@
                     <div class="avatar-frame" style="${winnerClass}">${avatarHtml}</div>
                     <div class="player-info-box">
                         <div style="margin-bottom:2px;">${roleBadge}</div>
-                        <div class="player-name">${p.name}</div>
+                        <div class="player-name">${escapeHTML(p.name)}</div>
+                        ${p.bot_style ? `<div class="bot-style">${escapeHTML(p.bot_style)}</div>` : ""}
                         <div class="player-chips">$${p.chips}</div>
                         ${statusStr ? `<div class="player-status">${statusStr}</div>` : ''}
                     </div>
@@ -957,7 +967,7 @@
                 sortedPlayers.forEach(p => {
                     const medal = p.rank === 1 ? '🥇' : p.rank === 2 ? '🥈' : p.rank === 3 ? '🥉' : '';
                     const name = state.players.find(pl => pl.user_id === p.playerId)?.name || p.playerId;
-                    html += `<div style="padding: 5px; border-bottom: 1px solid #555;">${p.rank}. ${medal} <b>${name}</b></div>`;
+                    html += `<div style="padding: 5px; border-bottom: 1px solid #555;">${p.rank}. ${medal} <b>${escapeHTML(name)}</b></div>`;
                 });
                 const modal = document.getElementById('settlementModal');
                 if (modal) {
@@ -970,6 +980,14 @@
                 const modal = document.getElementById('settlementModal');
                 if (modal) modal.style.display = 'none';
             }
+
+            proUpdate(state);
+            const callNeeded = Math.max(0, state.current_bet_amount - (me?.current_bet || 0));
+            document.querySelector("button[onclick=\"performAction('check')\"]").disabled = callNeeded > 0;
+            const callButton = document.querySelector("button[onclick=\"performAction('call')\"]");
+            callButton.disabled = callNeeded === 0;
+            callButton.textContent = '跟注 ' + Math.min(callNeeded, me?.chips || 0);
+            document.querySelectorAll("button[onclick^='setQuickBet'], button[onclick=\"performAction('raise')\"]").forEach(b => b.disabled = me?.can_raise === false || (me?.chips || 0) + (me?.current_bet || 0) <= state.current_bet_amount);
 
             // Game sound effects (TTS)
             if (state.action_count !== undefined && state.action_count > lastActionCount) {
@@ -986,7 +1004,8 @@
             
         }
 
-        init();
+        window.addEventListener("DOMContentLoaded", init);
     </script>
+<script src="/poker-pro.js"></script>
 </body>
 </html>
