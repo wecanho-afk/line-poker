@@ -34,6 +34,11 @@ async function loadScenes() {
         const res=await api('/practice_scenarios'); if(proView!=='practice')return;
         if(!res.success)throw Error('無法載入');
         panel.innerHTML='<div class="panel-top"><div><h2>經典場景練習</h2><div class="muted">從關鍵決策開始，與不同風格的對手打完一手。</div></div></div><div class="scene-grid">'+res.scenarios.map(s=>`<article class="scene-card"><span class="scene-tag">${escapeHTML(s.category)} / ${escapeHTML(s.difficulty)}</span><h3>${escapeHTML(s.title)}</h3><p>${escapeHTML(s.prompt)}</p><button class="btn-gold" data-scene="${escapeHTML(s.id)}">進入練習 →</button></article>`).join('')+'</div>';
+        const filter=document.createElement('label');
+        filter.className='scene-filter';
+        filter.innerHTML='選擇類型 <select aria-label="練習類型"><option value="">全部 '+res.scenarios.length+' 個場景</option>'+[...new Set(res.scenarios.map(s=>s.category))].map(c=>'<option>'+escapeHTML(c)+'</option>').join('')+'</select>';
+        panel.querySelector('.panel-top').after(filter);
+        filter.querySelector('select').onchange=e=>panel.querySelectorAll('.scene-card').forEach((card,i)=>card.hidden=!!e.target.value && res.scenarios[i].category!==e.target.value);
         panel.querySelectorAll('[data-scene]').forEach(b=>b.onclick=()=>startPractice(b.dataset.scene,b));
     } catch { if(proView==='practice')panel.innerHTML='<p role="alert">無法載入場景，請稍後再試。</p>'; }
 }

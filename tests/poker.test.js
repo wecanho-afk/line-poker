@@ -26,20 +26,42 @@ test('invalid actions cannot mutate chips, pot, turn or history',()=>{
  for(const n of [NaN,Infinity,-1,0,1.5,100000]){assert.equal(g.playerAction(p.userId,'raise',n)[0],false);assert.equal(JSON.stringify(g),before);}
  assert.equal(g.playerAction(p.userId,'check')[0],false);assert.equal(JSON.stringify(g),before);
 });
-test('all six practice setups have unique cards, conserved pots and legal bot actions',()=>{
+test('all 24 practice setups have unique cards, conserved pots and legal bot actions',()=>{
+ assert.equal(practice.scenarios.length,24);
+ assert.equal(new Set(practice.scenarios.map(s=>s.id)).size,24);
  for(const scene of practice.scenarios){
   const g=new TexasHoldemGame('p','hero','Hero',10000);practice.setup(g,scene,Card,Deck);
   const cards=[...g.communityCards,...Object.values(g.players).flatMap(p=>p.hand),...g.deck.cards].map(String);
   assert.equal(cards.length,52);assert.equal(new Set(cards).size,52);
   assert.equal(g.pot,Object.values(g.players).reduce((n,p)=>n+p.invested,0));
   assert.equal(g.getCurrentPlayer().userId,'hero');
+  assert.equal(g.dealerId,scene.dealer==='villain'?g.playersOrder[1]:'hero');
+  assert.equal(g.players[g.playersOrder[1]].allIn,scene.villainStack===0);
   const hero=g.players.hero, d=strategy.analyze(strategy.context(g,hero));
   assert.equal(g.playerAction('hero',d.action,d.amount)[0],true);
   if(['pre_flop','flop','turn','river'].includes(g.gameState)){
-   const p=g.getCurrentPlayer(),decision=strategy.decide(g,p,strategy.seeded(scene.id));
-   assert.equal(g.playerAction(p.userId,decision.action,decision.amount)[0],true,scene.id);
+   const p=g.getCurrentPlayer();
+   if(p.canBet()) {
+    const decision=strategy.decide(g,p,strategy.seeded(scene.id));
+    assert.equal(g.playerAction(p.userId,decision.action,decision.amount)[0],true,scene.id);
+   } else {
+    assert.ok(g.activePlayersInRound.every(id=>g.players[id].allIn));
+    while(['pre_flop','flop','turn','river'].includes(g.gameState))g.endBettingRound();
+    assert.equal(g.gameState,'showdown');
+    assert.equal(Object.values(g.players).reduce((n,p)=>n+p.chips,0),scene.stack+scene.villainStack+scene.invested*2+scene.heroBet+scene.villainBet);
+   }
   }
  }
+});
+test('all-in drill disallows reraising and limp drill ends after a BB check',()=>{
+ const g=new TexasHoldemGame('allin','hero','Hero',10000);
+ practice.setup(g,practice.scenarios.find(s=>s.id==='call-short-shove'),Card,Deck);
+ assert.equal(strategy.context(g,g.players.hero).canRaise,false);
+ assert.equal(g.playerAction('hero','raise',1200)[0],false);
+ const limp=new TexasHoldemGame('limp','hero','Hero',10000);
+ practice.setup(limp,practice.scenarios.find(s=>s.id==='limp-isolation'),Card,Deck);
+ assert.equal(limp.playerAction('hero','check')[0],true);
+ assert.equal(limp.gameState,'flop');
 });
 test('short all-in does not reopen raising, but a full raise does',()=>{
  const g=new TexasHoldemGame('test','hero','Hero');g.addPlayer('b','B');g.addPlayer('c','C');g.startGame();
