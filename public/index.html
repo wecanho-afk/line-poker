@@ -372,6 +372,8 @@
         let timerInterval = null;
 
         function initSocket() {
+            startStateSync();
+            if (typeof io !== "function") return;
             socket = io(BACKEND_URL);
             socket.on('connect', () => {
                 if (gameId && userId) {
@@ -786,6 +788,8 @@
         let tournamentInterval = null;
         
         function updateUI(state) {
+            if (state.game_id !== gameId) return;
+            if (proState?.game_id === state.game_id && state.snapshot_version && proState.snapshot_version > state.snapshot_version) return;
             window.currentPot = state.pot;
             window.currentBetAmount = state.current_bet_amount;
             window.minRaise = state.min_raise;

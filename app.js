@@ -344,6 +344,7 @@ class TexasHoldemGame {
 
     startNewRound() {
         if (!['waiting_for_players', 'waiting_for_next_round', 'game_over'].includes(this.gameState)) return;
+        this.cancelScheduledAction();
         this.deck = new Deck();
         this.communityCards = [];
         this.pot = 0;
@@ -476,10 +477,12 @@ class TexasHoldemGame {
         history.finish(this);
         
         broadcastState(this.gameId);
-        setTimeout(() => { this.prepareNext(); broadcastState(this.gameId); }, 4000);
+        this.scheduleAction('next', 4000);
     }
 
     endBettingRound() {
+        if (!['pre_flop','flop','turn','river'].includes(this.gameState)) return;
+        this.cancelScheduledAction();
         this.messages.push("下注回合結束");
         this.currentBetAmount = 0;
         this.lastRaiseAmount = this.blinds.big; // 新回合最低加注至少是一個大盲
@@ -535,7 +538,8 @@ class TexasHoldemGame {
         if (canActCount <= 1) {
              // Auto-deal remaining cards if everyone is all-in
              broadcastState(this.gameId);
-             setTimeout(() => { this.endBettingRound(); }, 1500);
+             this.turnDeadline = 0;
+             this.scheduleAction('runout', 1500);
              return;
         }
 
@@ -607,7 +611,7 @@ class TexasHoldemGame {
         }
 
         if (success) {
-            if (this.turnTimeout) { clearTimeout(this.turnTimeout); this.turnTimeout = null; }
+            this.cancelScheduledAction();
             player.hasActed = true;
             player.actedAtBet = this.currentBetAmount;
             history.record(this, event);
@@ -632,46 +636,61 @@ class TexasHoldemGame {
     }
 
 
-    startTurnTimer() {
-        if (this.turnTimeout) { clearTimeout(this.turnTimeout); this.turnTimeout = null; }
-        if (['waiting_for_players', 'game_over', 'showdown', 'waiting_for_next_round'].includes(this.gameState)) {
-            this.turnDeadline = 0;
-            return;
-        }
-        
-        const currentPlayer = this.getCurrentPlayer();
-        if (!currentPlayer) return;
-        if (this.practice && !currentPlayer.isBot) {
-            this.turnDeadline = 0;
-            broadcastState(this.gameId);
-            return;
-        }
+    cancelScheduledAction() {
+        if (this.turnTimeout) clearTimeout(this.turnTimeout);
+        this.turnTimeout = null;
+        this.scheduledAction = null;
+    }
 
-        if (currentPlayer.isBot) {
-            this.turnDeadline = Date.now() + 3000;
-            this.turnTimeout = setTimeout(() => {
-                if (this.getCurrentPlayer() && this.getCurrentPlayer().userId === currentPlayer.userId) {
-                    this.makeBotDecision(currentPlayer);
-                }
-            }, 3000);
-        } else {
-            this.turnDeadline = Date.now() + 20000; // 20 seconds
-            this.turnTimeout = setTimeout(() => {
-                if (this.getCurrentPlayer() && this.getCurrentPlayer().userId === currentPlayer.userId) {
-                    const callAmount = this.currentBetAmount - currentPlayer.currentBet;
-                    this.playerAction(currentPlayer.userId, callAmount === 0 ? 'check' : 'fold');
-                }
-            }, 20000);
+    scheduleAction(kind, delay) {
+        this.cancelScheduledAction();
+        this.scheduledAction = { kind, due: Date.now() + delay, hand: this.handNumber,
+            street: this.gameState, playerId: this.getCurrentPlayer()?.userId };
+        this.turnTimeout = setTimeout(() => this.advanceDueAction(), delay);
+    }
+
+    // HTTP synchronization also drives overdue work when a host suspends timers.
+    // Consume before executing, so a timer and a polling request cannot act twice.
+    advanceDueAction(now = Date.now()) {
+        const pending = this.scheduledAction;
+        if (!pending || pending.due > now) return;
+        this.cancelScheduledAction();
+        if (pending.hand !== this.handNumber || pending.street !== this.gameState) return;
+        if (pending.kind === 'next') this.prepareNext();
+        else if (pending.kind === 'runout') this.endBettingRound();
+        else {
+            const player = this.getCurrentPlayer();
+            if (!player || player.userId !== pending.playerId || !player.canBet()) return;
+            if (player.isBot) this.makeBotDecision(player);
+            else this.playerAction(player.userId, this.currentBetAmount > player.currentBet ? 'fold' : 'check');
         }
         broadcastState(this.gameId);
     }
 
+    startTurnTimer() {
+        this.cancelScheduledAction();
+        this.turnDeadline = 0;
+        if (!['pre_flop', 'flop', 'turn', 'river'].includes(this.gameState)) return;
+        const currentPlayer = this.getCurrentPlayer();
+        if (!currentPlayer || !currentPlayer.canBet()) return;
+        if (!this.practice || currentPlayer.isBot) {
+            const delay = currentPlayer.isBot ? 3000 : 20000;
+            this.turnDeadline = Date.now() + delay;
+            this.scheduleAction('turn', delay);
+        }
+        broadcastState(this.gameId);
+    }
 
     makeBotDecision(bot) {
         if (!['pre_flop', 'flop', 'turn', 'river'].includes(this.gameState) || bot.allIn || bot.folded) return;
         
         // Use GTO logic for decision
-        const decision = PokerBotGTO.decide(this, bot);
+        let decision;
+        try { decision = PokerBotGTO.decide(this, bot); }
+        catch (error) {
+            console.error('Bot decision failed:', error.message);
+            decision = { action: this.currentBetAmount > bot.currentBet ? 'fold' : 'check', amount: 0 };
+        }
         
         let action = decision.action;
         let amount = decision.amount;
@@ -689,8 +708,7 @@ class TexasHoldemGame {
         const res = this.playerAction(bot.userId, action, amount);
         if (res && res[0] === false) {
              // force fold if invalid
-             this.players[bot.userId].hasActed = false; // reset flag
-             this.playerAction(bot.userId, 'fold');
+             this.playerAction(bot.userId, this.currentBetAmount > bot.currentBet ? 'fold' : 'check');
         }
     }
 
@@ -864,7 +882,7 @@ class TexasHoldemGame {
         this.latestVoice = 'winner';
         
         broadcastState(this.gameId);
-        setTimeout(() => { this.prepareNext(); broadcastState(this.gameId); }, 6000);
+        this.scheduleAction('next', 6000);
     }
 
     prepareNext() {
@@ -913,7 +931,9 @@ class TexasHoldemGame {
     }
 
     toJSON(userId) {
+        this.snapshotVersion = (this.snapshotVersion || 0) + 1;
         return {
+            snapshot_version: this.snapshotVersion,
             viewer_id: userId,
             hand_number: this.handNumber || 0,
             blinds: this.blinds,
@@ -936,7 +956,7 @@ class TexasHoldemGame {
             turn_deadline: this.turnDeadline,
             min_raise: this.currentBetAmount + this.lastRaiseAmount,
             community_cards: this.communityCards.map(c => c.toString()),
-            current_player_id: this.getCurrentPlayer() ? this.getCurrentPlayer().userId : null,
+            current_player_id: ['pre_flop','flop','turn','river'].includes(this.gameState) && this.scheduledAction?.kind !== 'runout' && this.getCurrentPlayer()?.canBet() ? this.getCurrentPlayer().userId : null,
             winners: this.winners,
             action_count: this.actionCount || 0,
             latest_voice: this.latestVoice || '',
@@ -1070,6 +1090,8 @@ app.get('/get_game_state/:game_id/:user_id', (req, res) => {
     if (!game) return res.status(404).json({ success: false });
     const player = game.players[user_id];
     if (player?.historyKey && player.historyKey !== req.get('X-History-Key')) return res.status(403).json({ success: false });
+    game.advanceDueAction();
+    res.set('Cache-Control', 'no-store');
     res.json({ success: true, game_state: game.toJSON(user_id) });
 });
 
@@ -1125,7 +1147,8 @@ io.on('connection', socket => {
     });
     socket.on('disconnect', () => {
         if (socket.gameId && socket.userId && GAMES[socket.gameId]) {
-            GAMES[socket.gameId].handleDisconnect(socket.userId);
+            // Human turn deadlines still check/fold inactive players.
+            // A disconnected socket alone does not mean the player left the page.
             broadcastState(socket.gameId);
         }
     });

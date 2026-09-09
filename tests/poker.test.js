@@ -22,9 +22,9 @@ test('private cards and future deck never change the decision context or estimat
  assert.deepEqual(strategy.context(g,hero),c);assert.deepEqual(strategy.analyze(strategy.context(g,hero)),a);
 });
 test('invalid actions cannot mutate chips, pot, turn or history',()=>{
- const g=game(),p=g.getCurrentPlayer();const before=JSON.stringify(g);
- for(const n of [NaN,Infinity,-1,0,1.5,100000]){assert.equal(g.playerAction(p.userId,'raise',n)[0],false);assert.equal(JSON.stringify(g),before);}
- assert.equal(g.playerAction(p.userId,'check')[0],false);assert.equal(JSON.stringify(g),before);
+ const g=game(),p=g.getCurrentPlayer();const before=JSON.stringify({...g});
+ for(const n of [NaN,Infinity,-1,0,1.5,100000]){assert.equal(g.playerAction(p.userId,'raise',n)[0],false);assert.equal(JSON.stringify({...g}),before);}
+ assert.equal(g.playerAction(p.userId,'check')[0],false);assert.equal(JSON.stringify({...g}),before);
 });
 test('all 24 practice setups have unique cards, conserved pots and legal bot actions',()=>{
  assert.equal(practice.scenarios.length,24);

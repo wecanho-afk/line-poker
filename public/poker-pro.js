@@ -2,6 +2,42 @@ const actionLabels = { fold:'棄牌', check:'過牌', call:'跟注', raise:'加�
 const streetLabels = { pre_flop:'翻牌前', flop:'翻牌', turn:'轉牌', river:'河牌', showdown:'攤牌', waiting_for_players:'等待入座', waiting_for_next_round:'本手結束', game_over:'牌局結束' };
 let proState = null, proView = 'table', reviewHands = [], selectedHand = 0, selectedStep = 0;
 let historyKey;
+let stateSyncTimer = null, stateSyncBusy = false;
+function startStateSync() {
+    if (stateSyncTimer) return;
+    const status = document.createElement('div');
+    status.id = 'sync-status'; status.setAttribute('role', 'status'); status.hidden = true;
+    document.querySelector('.pro-nav').after(status);
+    const sync = async () => {
+        if (!gameId || stateSyncBusy) return;
+        const requestedGame = gameId;
+        stateSyncBusy = true;
+        try {
+            const response = await fetch(`${BACKEND_URL}/get_game_state/${encodeURIComponent(requestedGame)}/${encodeURIComponent(userId)}`, {
+                headers: { 'X-History-Key': historyKey }, cache: 'no-store', signal: AbortSignal.timeout(8000)
+            });
+            const res = await response.json();
+            if (gameId !== requestedGame) return;
+            if (!response.ok || !res.success) {
+                status.textContent = response.status === 404 ? '牌局已失效或伺服器已重新啟動，請重新進房。' : '無法同步牌局，正在重試…';
+                status.hidden = false;
+                if (response.status === 404) {
+                    gameId = ''; proState = null; isHost = false;
+                    document.getElementById('game-controls').style.display = 'none';
+                    showProView('table');
+                }
+                return;
+            }
+            status.hidden = true;
+            updateUI(res.game_state);
+        } catch {
+            if (gameId === requestedGame) { status.textContent = '連線暫時中斷，正在重新同步…'; status.hidden = false; }
+        } finally { stateSyncBusy = false; }
+    };
+    stateSyncTimer = setInterval(sync, 1000);
+    window.addEventListener('online', sync);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) sync(); });
+}
 try { historyKey = localStorage.getItem('poker-history-key'); if(!historyKey) { historyKey = crypto.randomUUID(); localStorage.setItem('poker-history-key',historyKey); } }
 catch { historyKey = crypto.randomUUID(); }
 function escapeHTML(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -84,5 +120,6 @@ document.getElementById('lobby-return').onclick=()=>{
     if(socket)socket.disconnect();
     if(timerInterval)clearInterval(timerInterval);if(tournamentInterval)clearInterval(tournamentInterval);
     gameId='';proState=null;isHost=false;knownCommunityCards=[];knownPlayerCards={};
+    document.getElementById('sync-status').hidden=true;
     initSocket();showProView('table');document.getElementById('game-controls').style.display='none';
 };
