@@ -2,6 +2,27 @@ const actionLabels = { fold:'棄牌', check:'過牌', call:'跟注', raise:'加�
 const streetLabels = { pre_flop:'翻牌前', flop:'翻牌', turn:'轉牌', river:'河牌', showdown:'攤牌', waiting_for_players:'等待入座', waiting_for_next_round:'本手結束', game_over:'牌局結束' };
 let proState = null, proView = 'table', reviewHands = [], selectedHand = 0, selectedStep = 0;
 let historyKey;
+const handSaveStates = new Map();
+let historyNotice = '', historyLoadVersion = 0;
+const cacheOwner = () => userId + ':' + historyKey;
+function mergeReviews(...groups) {
+    return [...new Map(groups.flat().map(h=>[h.id,h])).values()].sort((a,b)=>b.started.localeCompare(a.started)).slice(0,100);
+}
+function updateHandSaveStatus(state) {
+    let el=document.getElementById('hand-save-status');
+    if(!el){el=document.createElement('div');el.id='hand-save-status';el.setAttribute('role','status');document.getElementById('practice-context').after(el);}
+    const review=state.completed_hand;
+    el.hidden=!review;
+    if(!review)return;
+    const owner=cacheOwner(), key=owner+':'+review.id;
+    if(!handSaveStates.has(key)) {
+        handSaveStates.set(key,'saving');
+        HandCache.save(owner,[review]).then(()=>handSaveStates.set(key,'saved')).catch(()=>handSaveStates.set(key,'failed')).finally(()=>{
+            if(proState?.completed_hand?.id===review.id && cacheOwner()===owner)updateHandSaveStatus(proState);
+        });
+    }
+    el.textContent={saving:'正在儲存手牌…',saved:'手牌已儲存在此瀏覽器，可到「手牌回顧」檢討。',failed:'瀏覽器無法保存手牌，請允許網站儲存資料；目前仍可開啟回顧。'}[handSaveStates.get(key)];
+}
 let stateSyncTimer = null, stateSyncBusy = false;
 function startStateSync() {
     if (stateSyncTimer) return;
@@ -43,11 +64,12 @@ catch { historyKey = crypto.randomUUID(); }
 function escapeHTML(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function proUpdate(state) {
     proState = state;
+    updateHandSaveStatus(state);
     document.body.classList.toggle('playing', proView === 'table');
     document.getElementById('table-meta').textContent = `第 ${state.hand_number || 0} 手　 •　 ${streetLabels[state.game_state] || state.game_state}　 •　 盲注 ${state.blinds?.small || 0} / ${state.blinds?.big || 0}`;
     const banner = document.getElementById('practice-context');
-    banner.hidden = !state.practice && !state.history_error;
-    banner.textContent = state.history_error ? '這手牌未能儲存，請檢查伺服器儲存空間。' : state.practice ? `${state.practice.title}｜${state.practice.prompt}${state.practice.lesson ? '　解析：' + state.practice.lesson : ''}` : '';
+    banner.hidden = !state.practice;
+    banner.textContent = state.practice ? `${state.practice.title}｜${state.practice.prompt}${state.practice.lesson ? '　解析：' + state.practice.lesson : ''}` : '';
     document.getElementById('repeat-practice').hidden = !state.practice || !['waiting_for_next_round','game_over'].includes(state.game_state);
     if(state.practice) document.getElementById('next-btn').style.display='none';
     document.getElementById('lobby-return').hidden = ['pre_flop','flop','turn','river','showdown'].includes(state.game_state);
@@ -87,19 +109,38 @@ async function startPractice(id, button) {
         if(!res.success)throw Error(res.message||'無法開始練習');
         if(socket)socket.disconnect();
         gameId=res.game_id; isHost=true; knownCommunityCards=[]; knownPlayerCards={};
-        initSocket(); showGame(); proState=res.game_state; showProView('table'); updateUI(res.game_state);
+        initSocket(); showGame(); proState=res.game_state; showProView('table');
     }catch(e){alert(e.message);}finally{if(button)button.disabled=false;}
 }
 async function loadHistory() {
     const panel=document.getElementById('pro-panel'); panel.innerHTML='<p role="status">讀取手牌紀錄…</p>';
+    const version=++historyLoadVersion, owner=cacheOwner();
+    let local=[],cacheFailed=false;
+    try { local=await HandCache.read(owner); } catch { cacheFailed=true; }
+    if(proView!=='history'||version!==historyLoadVersion)return;
+    const pending=proState?.completed_hand ? [proState.completed_hand] : [];
+    reviewHands=mergeReviews(local,pending);selectedHand=0;selectedStep=0;
+    historyNotice=cacheFailed?'瀏覽器儲存空間無法使用；本次回顧可能不會在重新整理後保留。':'保存在此瀏覽器；清除網站資料或換裝置不會保留紀錄。';
+    if(reviewHands.length)renderHistory();
     try {
-        const res=await api('/hand_history/'+encodeURIComponent(userId)); if(proView!=='history')return;
-        if(!res.success)throw Error('無法讀取'); reviewHands=res.hands; selectedHand=0; selectedStep=0; renderHistory();
-    }catch { if(proView==='history')panel.innerHTML='<p role="alert">無法讀取紀錄。請回到原本的瀏覽器，或稍後重試。</p>'; }
+        const response=await fetch(`${BACKEND_URL}/hand_history/${encodeURIComponent(userId)}`,{headers:{'X-History-Key':historyKey},cache:'no-store',signal:AbortSignal.timeout(8000)});
+        const res=await response.json();
+        if(!response.ok||!res.success)throw Error('無法讀取');
+        const merged=mergeReviews(local,pending,res.hands);
+        try { await HandCache.save(owner,merged); }
+        catch { historyNotice='目前可檢討，但瀏覽器無法保存紀錄，請允許網站儲存資料。'; }
+        if(proView!=='history'||version!==historyLoadVersion)return;
+        const selectedId=reviewHands[selectedHand]?.id;
+        reviewHands=merged;selectedHand=Math.max(0,merged.findIndex(h=>h.id===selectedId));renderHistory();
+    }catch {
+        if(proView!=='history'||version!==historyLoadVersion)return;
+        historyNotice=reviewHands.length?'伺服器暫時無法連線，顯示此瀏覽器保存的手牌。':'目前無法連線，且此瀏覽器沒有已保存的手牌。';
+        renderHistory();
+    }
 }
 function renderHistory() {
     const panel=document.getElementById('pro-panel');
-    panel.innerHTML='<div class="panel-top"><div><h2>手牌回顧</h2><div class="muted">最近 100 手 · 僅顯示你的底牌與當時可見資訊</div></div><button id="reload-history">重新整理</button></div>';
+    panel.innerHTML='<div class="panel-top"><div><h2>手牌回顧</h2><div class="muted">最近 100 手 · 僅顯示你的底牌與當時可見資訊</div></div><button id="reload-history">重新整理</button></div><p class="muted" role="status">'+escapeHTML(historyNotice)+'</p>';
     document.getElementById('reload-history').onclick=loadHistory;
     if(!reviewHands.length) { panel.innerHTML+='<div class="empty-state">還沒有已完成的手牌。<br>打一手牌或完成場景練習，這裡就會出現逐步回顧。</div>';return; }
     panel.innerHTML+='<div class="history-layout"><div class="hand-list" aria-label="手牌清單">'+reviewHands.map((h,i)=>`<button data-hand="${i}" class="${i===selectedHand?'selected':''}">第 ${h.number} 手 · ${escapeHTML(h.hand.join(' '))}<br><span class="${h.net>=0?'positive':'negative'}">${h.net>=0?'+':''}${h.net}</span> · ${escapeHTML(h.scenario?.title||h.gameId)}<br><small>${escapeHTML(new Date(h.started).toLocaleString())}</small></button>`).join('')+'</div><article class="review-card" id="review-detail"></article></div>';

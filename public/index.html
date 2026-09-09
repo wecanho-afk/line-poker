@@ -765,6 +765,7 @@
             else alert(res.message || '操作未成功');
         }
 
+        let knownHandKey = null;
         let knownCommunityCards = [];
         let knownPlayerCards = {};
 
@@ -818,7 +819,9 @@
             const communityDiv = document.getElementById('community-cards');
             communityDiv.innerHTML = '';
             
-            if (state.community_cards.length === 0) {
+            const handKey = state.game_id + ":" + state.hand_number;
+            if (knownHandKey !== handKey) {
+                knownHandKey = handKey;
                 knownCommunityCards = [];
                 knownPlayerCards = {};
             }
@@ -1010,6 +1013,7 @@
 
         window.addEventListener("DOMContentLoaded", init);
     </script>
+<script src="/hand-cache.js"></script>
 <script src="/poker-pro.js"></script>
 </body>
 </html>

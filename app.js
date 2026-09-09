@@ -938,6 +938,7 @@ class TexasHoldemGame {
             hand_number: this.handNumber || 0,
             blinds: this.blinds,
             history_error: this.historyError || false,
+            completed_hand: this.completedReviews?.[userId] || null,
             practice: this.practice ? { id: this.practice.id, title: this.practice.title, prompt: this.practice.prompt, lesson: this.currentHand?.finished ? this.practice.lesson : null } : null,
             game_id: this.gameId,
             game_mode: this.gameMode,

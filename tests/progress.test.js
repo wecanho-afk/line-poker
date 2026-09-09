@@ -41,4 +41,21 @@ test('bot strategy exceptions cannot strand a turn',()=>{
  try{g.scheduledAction.due=0;g.advanceDueAction();assert.equal(g.actionCount,2);assert.equal(g.getCurrentPlayer().userId,'hero');}
  finally{bot.decide=decide;}
 });
+test('a read-only archive still delivers an owner-only completed hand',()=>{
+ const oldDirectory=process.env.POKER_HISTORY_DIR;
+ const blocked=path.join(oldDirectory,'blocked');fs.writeFileSync(blocked,'not a directory');
+ process.env.POKER_HISTORY_DIR=blocked;
+ try{
+  const g=make('btn-open');g.players.hero.historyKey='browser-save-test';
+  assert.equal(g.playerAction('hero','fold')[0],true);
+  assert.equal(g.historyError,true);
+  const own=g.toJSON('hero').completed_hand;
+  assert.ok(own?.id);assert.deepEqual(own.hand,g.players.hero.hand.map(String));
+  assert.equal(g.toJSON('unrelated').completed_hand,null);
+  assert.equal(g.toJSON(g.playersOrder[1]).completed_hand,null);
+  assert.ok(own.actions.every(a=>!('context' in a)));
+  const archived=require('../hand-history').read('hero:browser-save-test');
+  assert.ok(archived.some(h=>h.id===own.id));
+ }finally{process.env.POKER_HISTORY_DIR=oldDirectory;}
+});
 after(()=>{games.forEach(g=>g.cancelScheduledAction());io.close();server.close();fs.rmSync(process.env.POKER_HISTORY_DIR,{recursive:true,force:true});});
