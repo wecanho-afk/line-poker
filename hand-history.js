@@ -5,9 +5,15 @@ const strategy = require('./poker-strategy');
 const clone = value => JSON.parse(JSON.stringify(value));
 const directory = () => process.env.POKER_HISTORY_DIR || path.join(__dirname, '.data', 'hands');
 const filename = id => path.join(directory(), createHash('sha256').update(String(id)).digest('hex') + '.json');
+const recent = new Map();
+function merge(...groups) {
+    return [...new Map(groups.flat().map(h => [h.id, h])).values()]
+        .sort((a,b) => b.started.localeCompare(a.started)).slice(0,100);
+}
 function read(id) {
-    try { const data = JSON.parse(fs.readFileSync(filename(id), 'utf8')); return Array.isArray(data) ? data.slice(0, 100) : []; }
-    catch (e) { if (e.code !== 'ENOENT') console.error('Hand history read failed:', e.message); return []; }
+    const memory = recent.get(id) || [];
+    try { const data = JSON.parse(fs.readFileSync(filename(id), 'utf8')); return merge(Array.isArray(data) ? data : [], memory); }
+    catch (e) { if (e.code !== 'ENOENT') console.error('Hand history read failed:', e.message); return memory; }
 }
 function begin(game) {
     game.currentHand = { id: randomUUID(), number: (game.handNumber = (game.handNumber || 0) + 1), started: new Date().toISOString(),
@@ -36,7 +42,13 @@ function finish(game) {
                 return { ...publicEvent, mine: event.playerId === seat.id,
                     advice: event.playerId === seat.id && context ? strategy.analyze(context) : null };
             }) };
-        const records = [review, ...read(seat.id + ':' + (game.players[seat.id].historyKey || '')).filter(h => h.id !== review.id)].slice(0, 100);
+        const owner = seat.id + ':' + (game.players[seat.id].historyKey || '');
+        const records = merge(read(owner), [review]);
+        recent.delete(owner); recent.set(owner, records);
+        if (recent.size > 256) recent.delete(recent.keys().next().value);
+        // The viewer receives only their own completed review, even if disk fails.
+        game.completedReviews = game.completedReviews || {};
+        game.completedReviews[seat.id] = review;
         try {
             fs.mkdirSync(directory(), { recursive: true });
             const file = filename(seat.id + ':' + (game.players[seat.id].historyKey || '')), temp = file + '.tmp';

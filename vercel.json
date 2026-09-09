@@ -1,12 +1,31 @@
 {
   "version": 2,
   "builds": [
-    { "src": "server.js", "use": "@vercel/node" },
-    { "src": "public/**", "use": "@vercel/static" }
+    {
+      "src": "server.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "public/**",
+      "use": "@vercel/static"
+    }
   ],
   "routes": [
-    { "src": "/poker-pro.css", "dest": "/public/poker-pro.css" },
-    { "src": "/poker-pro.js", "dest": "/public/poker-pro.js" },
-    { "src": "/(.*)", "dest": "/server.js" }
+    {
+      "src": "/hand-cache.js",
+      "dest": "/public/hand-cache.js"
+    },
+    {
+      "src": "/poker-pro.css",
+      "dest": "/public/poker-pro.css"
+    },
+    {
+      "src": "/poker-pro.js",
+      "dest": "/public/poker-pro.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/server.js"
+    }
   ]
 }

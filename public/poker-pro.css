@@ -39,6 +39,8 @@ button:disabled { opacity:.45; }
 .container { min-height:0; }
 #sync-status { flex:none;padding:8px 14px;background:#493921;color:#ffe1a4;font-size:14px; }
 #sync-status[hidden] { display:none; }
+#hand-save-status { font-size:14px;line-height:1.6;color:#add8c5;max-width:760px;padding:4px 10px; }
+#hand-save-status[hidden] { display:none; }
 .workspace-panel,.history-layout,.history-layout>*,.review-card,.review-step { min-width:0; }
 .workspace-panel[hidden] { display:none; }
 .hand-list { min-height:0; align-self:start; overscroll-behavior:contain; scrollbar-gutter:stable; }
