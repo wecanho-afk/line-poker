@@ -23,6 +23,9 @@ const broadcastState = (gameId) => {
 
 app.use(cors());
 app.use(express.json());
+app.get('/health', (req, res) => {
+    res.set('Cache-Control', 'no-store').json({ status: 'ok', revision: process.env.RENDER_GIT_COMMIT || 'local' });
+});
 app.use(express.static(path.join(__dirname, 'public')));
 app.use((req, res, next) => {
     const game = GAMES[req.body?.game_id];
@@ -232,6 +235,7 @@ class TexasHoldemGame {
         this.messages = [];
         this.blinds = { small: parseInt(smallBlind), big: parseInt(smallBlind) * 2 };
         this.winners = [];
+        this.handSettled = false;
         this.actionCount = 0;
         this.latestVoice = '';
         this.turnDeadline = 0;
@@ -250,6 +254,14 @@ class TexasHoldemGame {
         
         if (['pre_flop', 'flop', 'turn', 'river'].includes(this.gameState)) {
             if (!p.folded && !p.allIn) {
+                // Once only all-in opponents remain and no call is owed, the
+                // hand is in runout. A disconnect cannot forfeit a locked side pot.
+                const opponentCanBet = this.activePlayersInRound.some(id => id !== userId && this.players[id].canBet());
+                if (!opponentCanBet && p.currentBet >= this.currentBetAmount) {
+                    this.endBettingRound();
+                    this.checkEmptyRoom();
+                    return;
+                }
                 history.record(this, history.capture(this, p, 'fold', 0));
                 // To avoid bugs, we just fold the disconnected player immediately
                 p.folded = true;
@@ -350,6 +362,7 @@ class TexasHoldemGame {
         this.pot = 0;
         this.currentBetAmount = 0;
         this.winners = [];
+        this.handSettled = false;
         
         if (this.tournamentManager) {
             this.tournamentManager.startTournament();
@@ -366,8 +379,9 @@ class TexasHoldemGame {
                 p.waitingForNextRound = false;
                 p.sittingOut = false;
             }
-            if (!p.sittingOut && p.chips > 0) p.resetForNewRound();
-            else p.folded = true;
+            // Contributions belong to one hand, including for absent/busted seats.
+            p.resetForNewRound();
+            if (p.sittingOut || p.chips <= 0) p.folded = true;
         });
 
         const validIds = this.playersOrder.filter(id => !this.players[id].sittingOut && this.players[id].chips > 0);
@@ -463,8 +477,11 @@ class TexasHoldemGame {
     }
 
     endRoundSingleWinner() {
+        if (this.handSettled) return;
+        this.handSettled = true;
         if (this.turnTimeout) clearTimeout(this.turnTimeout);
         this.turnDeadline = 0;
+        this.returnUncalledBet();
         const winnerId = this.activePlayersInRound.find(id => !this.players[id].folded);
         const winner = this.players[winnerId];
         winner.chips += this.pot;
@@ -483,6 +500,7 @@ class TexasHoldemGame {
     endBettingRound() {
         if (!['pre_flop','flop','turn','river'].includes(this.gameState)) return;
         this.cancelScheduledAction();
+        this.returnUncalledBet('currentBet');
         this.messages.push("下注回合結束");
         this.currentBetAmount = 0;
         this.lastRaiseAmount = this.blinds.big; // 新回合最低加注至少是一個大盲
@@ -814,9 +832,26 @@ class TexasHoldemGame {
         return { score: bestScore, desc: bestDesc };
     }
 
+    returnUncalledBet(field = 'invested') {
+        const contributors = Object.values(this.players).filter(p => p[field] > 0)
+            .sort((a, b) => b[field] - a[field]);
+        if (!contributors.length) return;
+        const player = contributors[0];
+        const refund = player[field] - (contributors[1]?.[field] || 0);
+        if (refund <= 0) return;
+        player.chips += refund;
+        player.invested -= refund;
+        player.currentBet = Math.max(0, player.currentBet - refund);
+        this.pot -= refund;
+        this.messages.push(`${player.name} 退回未被跟注的 ${refund}`);
+    }
+
     determineWinner() {
+        if (this.handSettled) return;
+        this.handSettled = true;
         if (this.turnTimeout) clearTimeout(this.turnTimeout);
         this.turnDeadline = 0;
+        this.returnUncalledBet();
         const investors = Object.values(this.players).filter(p => (p.invested || 0) > 0);
         const uniqueInvestments = [...new Set(investors.map(p => p.invested))].sort((a, b) => a - b);
         let previousInvested = 0;
@@ -829,18 +864,27 @@ class TexasHoldemGame {
             for (const p of investors) {
                 if (p.invested >= level) {
                     subPotAmount += contribution;
-                    if (!p.folded && !p.sittingOut) {
+                    // Disconnecting after an all-in does not kill a live hand.
+                    if (!p.folded) {
                         eligiblePlayers.push(p);
                     }
                 }
             }
             if (subPotAmount > 0) {
-                subPots.push({ amount: subPotAmount, eligiblePlayers });
+                // Folded stacks add dead money, not new side pots. Split once per
+                // distinct set of live contenders so odd chips are not awarded twice.
+                const previous = subPots[subPots.length - 1];
+                if (previous && previous.eligiblePlayers.length === eligiblePlayers.length &&
+                    previous.eligiblePlayers.every((p, i) => p === eligiblePlayers[i])) {
+                    previous.amount += subPotAmount;
+                } else {
+                    subPots.push({ amount: subPotAmount, eligiblePlayers });
+                }
             }
             previousInvested = level;
         }
 
-        const eligibleToWin = Object.values(this.players).filter(p => !p.folded && !p.sittingOut);
+        const eligibleToWin = investors.filter(p => !p.folded);
         const playerScores = new Map();
         eligibleToWin.forEach(p => {
             const evalResult = this.evaluateHand([...p.hand, ...this.communityCards]);
