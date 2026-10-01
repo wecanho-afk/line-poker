@@ -81,3 +81,51 @@ body.playing .poker-table { height:clamp(300px,calc(100dvh - 520px),430px); min-
  body.playing .pot-area { top:28%; }
  body.playing .player-info-box { padding:3px 5px; }
 }
+
+/* Reserve separate rows for seats, pot and board on narrow screens.
+   Let the container scroll instead of compressing these into a 300px table. */
+@media (max-width:520px) {
+ body.playing .poker-table {
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  grid-template-rows:auto auto minmax(82px,auto) auto auto;
+  align-items:start;
+  justify-items:center;
+  gap:16px 2px;
+  height:auto;
+  min-height:480px;
+  padding:18px 2px 28px;
+  margin:16px 6px 24px;
+ }
+ body.playing .poker-table:before { display:none; }
+ body.playing .poker-table .player-seat {
+  position:relative;
+  inset:auto;
+  transform:none;
+  width:100%;
+  max-width:82px;
+  min-width:0;
+ }
+ body.playing .player-info-box { width:100%;min-width:0;margin-top:4px; }
+ body.playing .poker-table .player-cards {
+  position:static;
+  transform:none;
+  gap:2px;
+  margin-bottom:6px;
+  min-height:40px;
+ }
+ body.playing .player-cards .card { width:27px;height:40px;font-size:14px;flex-shrink:0; }
+ body.playing .seat-0 .player-cards .card { width:36px;height:52px;font-size:18px; }
+ body.playing .seat-0 { grid-area:5 / 2; }
+ body.playing .seat-1 { grid-area:4 / 1; }
+ body.playing .seat-2 { grid-area:2 / 1; }
+ body.playing .seat-3 { grid-area:1 / 1; }
+ body.playing .seat-4 { grid-area:1 / 2; }
+ body.playing .seat-5 { grid-area:1 / 3; }
+ body.playing .seat-6 { grid-area:2 / 3; }
+ body.playing .seat-7 { grid-area:4 / 3; }
+ body.playing .pot-area { position:static;grid-area:2 / 2;align-self:center;max-width:100%; }
+ body.playing .pot-text { padding:8px 5px;font-size:18px;overflow-wrap:anywhere; }
+ body.playing .community-cards-area { grid-area:3 / 1 / 4 / 4;margin:0;align-self:center; }
+ body.playing .controls { flex-shrink:0;max-height:40dvh;overflow-y:auto; }
+}
