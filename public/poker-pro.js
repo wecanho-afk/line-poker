@@ -74,7 +74,7 @@ function proUpdate(state) {
     banner.textContent = state.practice ? `${state.practice.title}｜${state.practice.prompt}${state.practice.lesson ? '　解析：' + state.practice.lesson : ''}` : '';
     document.getElementById('repeat-practice').hidden = !state.practice || !['waiting_for_next_round','game_over'].includes(state.game_state);
     if(state.practice) document.getElementById('next-btn').style.display='none';
-    document.getElementById('lobby-return').hidden = ['pre_flop','flop','turn','river','showdown'].includes(state.game_state);
+    document.getElementById('lobby-return').hidden = false;
     if (proView !== 'table') { document.getElementById('game-view').style.display='none'; document.getElementById('game-controls').style.display='none'; }
 }
 function showProView(view) {
@@ -159,10 +159,36 @@ function renderStep() {
 document.querySelectorAll('[data-pro-view]').forEach(b=>b.onclick=()=>showProView(b.dataset.proView));
 document.getElementById('repeat-practice').onclick=()=>startPractice(proState.practice.id);
 document.getElementById('lobby-return').onclick=()=>{
-    if(proState && ['pre_flop','flop','turn','river','showdown'].includes(proState.game_state))return;
-    if(socket)socket.disconnect();
+    document.getElementById('leave-error').textContent='';
+    document.getElementById('leave-dialog').showModal();
+};
+async function confirmLeaveTable() {
+    const button=document.getElementById('leave-confirm');
+    if(button.disabled)return;
+    const leavingGame=gameId;
+    button.disabled=true;
+    try {
+        const result=await api('/leave_game','POST',{game_id:leavingGame,user_id:userId});
+        if(result.success) { if(gameId===leavingGame)returnToLobby(); }
+        else document.getElementById('leave-error').textContent=result.message||'退出失敗，請重試';
+    } catch { document.getElementById('leave-error').textContent='連線中斷，請確認連線後重試'; }
+    finally {button.disabled=false;}
+}
+function returnToLobby() {
+    document.getElementById('leave-dialog').close();
+    document.getElementById('rebuy-dialog').close();
+    if(localStream) {localStream.getTracks().forEach(t=>t.stop());localStream=null;}
+    Object.values(peers).forEach(p=>p.close());
+    for(const key in peers)delete peers[key];
+    document.getElementById('voice-chat-btn').textContent='📞 開啟通話';
+    document.getElementById('voice-chat-btn').classList.replace('btn-red','btn-blue');
+    if(socket){socket.disconnect();socket=null;}
     if(timerInterval)clearInterval(timerInterval);if(tournamentInterval)clearInterval(tournamentInterval);
     gameId='';proState=null;isHost=false;knownCommunityCards=[];knownPlayerCards={};
-    document.getElementById('sync-status').hidden=true;
-    initSocket();showProView('table');document.getElementById('game-controls').style.display='none';
-};
+    const status=document.getElementById('sync-status');if(status)status.hidden=true;
+    document.getElementById('turn-timer-display').textContent='';
+    // Clear the invitation URL so refreshing does not immediately rejoin.
+    window.history.replaceState(null,'',window.location.pathname);
+    showProView('table');document.getElementById('game-controls').style.display='none';
+    initSocket();
+}

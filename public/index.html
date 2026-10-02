@@ -283,7 +283,7 @@
             <div id="table-meta" class="table-meta"></div>
             <div id="practice-context" hidden></div>
             <button class="btn-gold" id="repeat-practice" hidden>再練一次</button>
-            <button class="btn-blue" id="lobby-return" hidden>返回大廳</button>
+            <button class="btn-red" id="lobby-return">退出此桌</button>
             <div class="poker-table" id="poker-table">
                 <!-- Pot Area -->
                 <div class="pot-area">
@@ -326,6 +326,16 @@
                 <button class="btn-green" onclick="performAction('raise')">加注</button>
             </div>
         </div>
+
+        <dialog id="leave-dialog" aria-labelledby="leave-title">
+            <h2 id="leave-title">確定要退出此桌？</h2>
+            <p>退出後返回大廳。若仍有需要行動的手牌，會蓋牌；已全下的手牌仍會完成結算。</p>
+            <p id="leave-error" role="alert"></p>
+            <div class="rebuy-actions">
+                <button type="button" class="btn-blue" autofocus onclick="document.getElementById('leave-dialog').close()">取消</button>
+                <button type="button" id="leave-confirm" class="btn-red" onclick="confirmLeaveTable()">確認退出</button>
+            </div>
+        </dialog>
 
         <dialog id="rebuy-dialog" aria-labelledby="rebuy-title">
             <form onsubmit="submitRebuy(event)">
@@ -406,6 +416,7 @@
                 if (isPlayer && state.viewer_id !== userId) return; // 忽略發給旁觀者的公版廣播
                 updateUI(state);
             });
+            socket.on('table_left', data => { if (data.game_id === gameId) returnToLobby(); });
             
             socket.on('voice_user_joined', async (remoteSocketId) => {
                 if (!localStream) return;
@@ -844,6 +855,7 @@
         function updateUI(state) {
             if (state.game_id !== gameId) return;
             if (proState?.game_id === state.game_id && state.snapshot_version && proState.snapshot_version > state.snapshot_version) return;
+            isHost = state.host_user_id === userId;
             window.currentPot = state.pot;
             window.currentBetAmount = state.current_bet_amount;
             window.minRaise = state.min_raise;
@@ -939,7 +951,8 @@
                 }
 
                 let statusStr = '';
-                if (p.folded) statusStr = '蓋牌';
+                if (p.left_table) statusStr = '已離桌';
+                else if (p.folded) statusStr = '蓋牌';
                 else if (p.all_in) statusStr = '全下';
                 else if (p.last_action === 'check') statusStr = '過牌';
                 else if (p.last_action === 'call') statusStr = `跟注 $${p.current_bet}`;

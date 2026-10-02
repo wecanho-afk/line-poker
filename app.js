@@ -246,11 +246,11 @@ class TexasHoldemGame {
     }
 
     
-    handleDisconnect(userId) {
+    handleDisconnect(userId, voluntary = false) {
         const p = this.players[userId];
         if (!p || p.sittingOut) return;
         p.sittingOut = true;
-        this.messages.push(`${p.name} 斷線離開了牌桌`);
+        this.messages.push(`${p.name} ${voluntary ? '退出了牌桌' : '斷線離開了牌桌'}`);
         
         if (['pre_flop', 'flop', 'turn', 'river'].includes(this.gameState)) {
             if (!p.folded && !p.allIn) {
@@ -265,7 +265,7 @@ class TexasHoldemGame {
                 history.record(this, history.capture(this, p, 'fold', 0));
                 // To avoid bugs, we just fold the disconnected player immediately
                 p.folded = true;
-                this.messages.push(`${p.name} 因斷線自動蓋牌`);
+                this.messages.push(`${p.name} ${voluntary ? '離桌蓋牌' : '因斷線自動蓋牌'}`);
                 
                 // If it was their turn, move to next
                 if (this.getCurrentPlayer() && this.getCurrentPlayer().userId === userId) {
@@ -982,12 +982,17 @@ class TexasHoldemGame {
         }
     }
 
+    getHostId() {
+        return this.playersOrder.find(id => !this.players[id].sittingOut && !this.players[id].isBot) || this.playersOrder[0];
+    }
+
     toJSON(userId) {
         this.snapshotVersion = (this.snapshotVersion || 0) + 1;
         const serverTime = Date.now();
         return {
             snapshot_version: this.snapshotVersion,
             viewer_id: userId,
+            host_user_id: this.getHostId(),
             hand_number: this.handNumber || 0,
             blinds: this.blinds,
             history_error: this.historyError || false,
@@ -1034,6 +1039,7 @@ class TexasHoldemGame {
                     chips: p.chips,
                     current_bet: p.currentBet,
                     folded: p.folded,
+                    left_table: !!p.leftTable,
                     all_in: p.allIn,
                     last_action: p.lastAction,
                     is_current_player: p.userId === (this.getCurrentPlayer() ? this.getCurrentPlayer().userId : null),
@@ -1067,6 +1073,13 @@ app.post('/join_game', (req, res) => {
         if (game.players[user_id].historyKey && game.players[user_id].historyKey !== req.get('X-History-Key')) return res.status(403).json({ success: false, message: '請使用原本的瀏覽器加入此座位' });
         // Already in game, just allow reconnect
         game.players[user_id].name = user_name || game.players[user_id].name;
+        const returning = game.players[user_id];
+        if (returning.leftTable) {
+            returning.leftTable = false;
+            returning.waitingForNextRound = ['pre_flop','flop','turn','river','showdown'].includes(game.gameState) && returning.hand.length === 0;
+            returning.sittingOut = returning.waitingForNextRound;
+            game.checkEmptyRoom();
+        }
         if (avatar) game.players[user_id].avatar = avatar;
         return res.json({ success: true, message: "重新連線", game_state: game.toJSON(user_id) });
     }
@@ -1076,11 +1089,32 @@ app.post('/join_game', (req, res) => {
     broadcastState(game_id);
 });
 
+app.post('/leave_game', async (req, res) => {
+    const {game_id, user_id} = req.body;
+    const game = GAMES[game_id];
+    if (!game) return res.json({success:true});
+    const player = game.players[user_id];
+    if (!player) return res.status(404).json({success:false,message:'找不到此座位'});
+    player.leftTable = true;
+    player.waitingForNextRound = false;
+    game.handleDisconnect(user_id, true);
+    game.checkEmptyRoom();
+    // Other tabs must not silently reactivate an explicitly vacated seat.
+    const sockets = await io.in(game_id).fetchSockets();
+    for (const peer of sockets.filter(s => s.userId === user_id)) {
+        peer.emit('table_left', {game_id});
+        peer.to(game_id).emit('voice_user_left', peer.id);
+        peer.leave(game_id);
+    }
+    res.json({success:true});
+    broadcastState(game_id);
+});
+
 app.post('/add_bot', (req, res) => {
     const { game_id, user_id } = req.body;
     const game = GAMES[game_id];
     if (!game) return res.status(404).json({ success: false, message: "房號不存在" });
-    if (game.playersOrder[0] !== user_id) return res.status(403).json({ success: false, message: "限房主操作" });
+    if (game.getHostId() !== user_id) return res.status(403).json({ success: false, message: "限房主操作" });
     const [ok, msg] = game.addBot();
     res.json({ success: ok, message: msg, game_state: game.toJSON(user_id) });
     if (ok) broadcastState(game_id); // Broadcast when bot added
@@ -1132,7 +1166,7 @@ app.post('/start_game', (req, res) => {
     const { game_id, user_id } = req.body;
     const game = GAMES[game_id];
     if (!game) return res.status(404).json({ success: false, message: '房號不存在' });
-    if (game.playersOrder[0] !== user_id) return res.status(403).json({ success: false, message: "限房主開始" });
+    if (game.getHostId() !== user_id) return res.status(403).json({ success: false, message: "限房主開始" });
     const [ok, msg] = game.startGame();
     res.json({ success: ok, message: msg, game_state: game.toJSON(user_id) });
 });
@@ -1188,6 +1222,7 @@ io.on('connection', socket => {
     socket.on('join_room', ({ game_id, user_id, history_key }) => {
         const player = GAMES[game_id]?.players[user_id];
         if (!player || (player.historyKey && player.historyKey !== history_key)) return;
+        if (player.leftTable) { socket.emit('table_left', {game_id}); return; }
         socket.join(game_id);
         socket.join(user_id); // 【修復】讓每個玩家也加入以自己 ID 命名的房間，用來接收私人手牌
         socket.userId = user_id;

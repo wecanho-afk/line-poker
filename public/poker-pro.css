@@ -1,6 +1,11 @@
 :root { color-scheme: dark; --gold:#e3ba73; --surface:#121d2b; --line:#2a3b50; }
 #rebuy-dialog { width:min(90vw,380px);padding:24px;background:#121d2b;color:#eaf0f6;border:1px solid #4a6079;border-radius:14px; }
 #rebuy-dialog::backdrop { background:#000a; }
+#leave-dialog { width:min(90vw,380px);padding:24px;background:#121d2b;color:#eaf0f6;border:1px solid #4a6079;border-radius:14px; }
+#leave-dialog::backdrop { background:#000a; }
+#leave-dialog h2 { margin-top:0; }
+#leave-dialog p { line-height:1.6; }
+#leave-error { color:#ff9ba7; }
 #rebuy-dialog h2 { margin-top:0; }
 #rebuy-dialog p { line-height:1.6; }
 #rebuy-dialog label { display:block;margin-bottom:8px; }
