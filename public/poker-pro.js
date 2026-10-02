@@ -34,10 +34,12 @@ function startStateSync() {
         const requestedGame = gameId;
         stateSyncBusy = true;
         try {
+            const requestStarted = performance.now();
             const response = await fetch(`${BACKEND_URL}/get_game_state/${encodeURIComponent(requestedGame)}/${encodeURIComponent(userId)}`, {
                 headers: { 'X-History-Key': historyKey }, cache: 'no-store', signal: AbortSignal.timeout(8000)
             });
             const res = await response.json();
+            turnClock.capture(res.game_state, requestStarted);
             if (gameId !== requestedGame) return;
             if (!response.ok || !res.success) {
                 status.textContent = response.status === 404 ? '牌局已失效或伺服器已重新啟動，請重新進房。' : '無法同步牌局，正在重試…';

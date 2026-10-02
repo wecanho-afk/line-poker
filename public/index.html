@@ -196,6 +196,7 @@
         .modal-content { background: #333; padding: 25px; border-radius: 10px; text-align: center; max-width: 80%; }
     </style>
 <link rel="stylesheet" href="/poker-pro.css">
+<script src="/turn-clock.js"></script>
 </head>
 <body>
     <div class="header">
@@ -298,7 +299,7 @@
                 <!-- Players will be injected here dynamically -->
             </div>
             
-            <div style="text-align: center; display: flex; flex-direction: row; gap: 10px; margin-top: 10px; justify-content: center;">
+            <div style="text-align: center; display: flex; flex-direction: row; flex-wrap: wrap; gap: 10px; margin-top: 10px; justify-content: center;">
                 <button id="rebuy-btn" class="btn-green" style="display: none; padding: 8px 12px; font-size: 0.8em;" onclick="rebuy()">💰 重新買入</button>
                 <button id="add-bot-btn" class="btn-blue" style="display: none; padding: 8px 12px; font-size: 0.8em;" onclick="addBot()">🤖 加電腦</button>
                 <button id="start-btn" class="btn-gold" style="display: none; padding: 8px 12px; font-size: 0.8em;" onclick="startGame()">▶️ 開始遊戲</button>
@@ -325,6 +326,20 @@
                 <button class="btn-green" onclick="performAction('raise')">加注</button>
             </div>
         </div>
+
+        <dialog id="rebuy-dialog" aria-labelledby="rebuy-title">
+            <form onsubmit="submitRebuy(event)">
+                <h2 id="rebuy-title">現金桌重新買入</h2>
+                <p>輸入本次要增加的籌碼。本手結束後才可買入。</p>
+                <label for="rebuy-amount">買入籌碼</label>
+                <input id="rebuy-amount" name="amount" type="number" inputmode="numeric" min="1" step="1" required>
+                <p id="rebuy-error" role="alert"></p>
+                <div class="rebuy-actions">
+                    <button type="button" class="btn-blue" onclick="document.getElementById('rebuy-dialog').close()">取消</button>
+                    <button id="rebuy-submit" type="submit" class="btn-green">確認買入</button>
+                </div>
+            </form>
+        </dialog>
 
         <div id="settlementModal" class="modal">
             <div class="modal-content" style="max-width: 300px;">
@@ -370,6 +385,7 @@
         let localStream = null;
         const peers = {};
         let timerInterval = null;
+        const turnClock = PokerTurnClock.create();
 
         function initSocket() {
             startStateSync();
@@ -385,6 +401,7 @@
                 }
             });
             socket.on('game_update', state => {
+                turnClock.capture(state);
                 const isPlayer = state.players.some(p => p.user_id === userId);
                 if (isPlayer && state.viewer_id !== userId) return; // 忽略發給旁觀者的公版廣播
                 updateUI(state);
@@ -473,18 +490,21 @@
             return pc;
         }
 
-        function startTimerUI(deadline) {
+        function startTimerUI(state) {
             if (timerInterval) clearInterval(timerInterval);
+            turnClock.accept(state);
             const timerEl = document.getElementById('turn-timer-display');
             if (!timerEl) return;
-            timerInterval = setInterval(() => {
-                const remaining = Math.max(0, deadline - Date.now());
-                timerEl.textContent = `⏳ 剩餘思考時間: ${(remaining/1000).toFixed(1)}s`;
+            const render = () => {
+                const remaining = turnClock.remaining();
+                const label = state.current_player_id === userId ? '你的思考時間' : '對手思考時間';
+                timerEl.textContent = remaining > 0 ? `⏳ ${label}: ${(remaining/1000).toFixed(1)}s` : '⏳ 時間已到，等待伺服器更新…';
                 if (remaining === 0) {
                     clearInterval(timerInterval);
-                    timerEl.textContent = '';
                 }
-            }, 100);
+            };
+            timerInterval = setInterval(render, 100);
+            render();
         }
 
 
@@ -636,13 +656,16 @@
         }
 
         async function api(path, method = 'GET', body = null) {
+            const requestStarted = performance.now();
             const options = {
                 method,
                 headers: { 'Content-Type': 'application/json', 'X-History-Key': historyKey }
             };
             if (body) options.body = JSON.stringify(body);
             const res = await fetch(`${BACKEND_URL}${path}`, options);
-            return res.json();
+            const result = await res.json();
+            turnClock.capture(result.game_state, requestStarted);
+            return result;
         }
 
         
@@ -696,10 +719,39 @@
         }
 
         async function rebuy() {
-            const initialChips = document.getElementById('initialChipsInput').value || 1000;
-            const res = await api('/rebuy', 'POST', { game_id: gameId, user_id: userId, amount: initialChips });
-            if (res.success) updateUI(res.game_state);
-            else alert(res.message || '買入失敗');
+            if (proState?.game_mode === 'tournament') {
+                const button = document.getElementById('rebuy-btn');
+                if (button.disabled) return;
+                button.disabled = true;
+                try {
+                    const res = await api('/rebuy', 'POST', { game_id: gameId, user_id: userId });
+                    if (res.success) updateUI(res.game_state);
+                    else alert(res.message || 'Re-entry 失敗');
+                } catch { alert('連線中斷，請先確認籌碼是否已更新'); }
+                finally { button.disabled = false; }
+                return;
+            }
+            document.getElementById('rebuy-error').textContent = '';
+            const input = document.getElementById('rebuy-amount');
+            if (!input.value) input.value = proState?.rebuy_default || 1000;
+            document.getElementById('rebuy-dialog').showModal();
+            input.focus(); input.select();
+        }
+
+        async function submitRebuy(event) {
+            event.preventDefault();
+            const button = document.getElementById('rebuy-submit');
+            if (button.disabled) return;
+            const amount = Number(document.getElementById('rebuy-amount').value);
+            const error = document.getElementById('rebuy-error');
+            if (!Number.isSafeInteger(amount) || amount <= 0) { error.textContent = '請輸入有效的正整數籌碼'; return; }
+            button.disabled = true; error.textContent = '';
+            try {
+                const res = await api('/rebuy', 'POST', { game_id: gameId, user_id: userId, amount });
+                if (res.success) { document.getElementById('rebuy-dialog').close(); updateUI(res.game_state); }
+                else error.textContent = res.message || '買入失敗';
+            } catch { error.textContent = '連線中斷，請先確認籌碼是否已更新，再重新操作'; }
+            finally { button.disabled = false; }
         }
 
         function showGame() {
@@ -759,10 +811,11 @@
                 game_id: gameId,
                 user_id: userId,
                 action: action,
-                amount: amount
+                amount: amount,
+                expected_action_count: proState?.action_count
             });
-            if (res.success) updateUI(res.game_state);
-            else alert(res.message || '操作未成功');
+            if (res.game_state) updateUI(res.game_state);
+            if (!res.success) alert(res.message || '操作未成功');
         }
 
         let knownHandKey = null;
@@ -950,7 +1003,10 @@
             
             // 重新買入按鈕
             const isBusted = me && me.chips === 0 && (me.folded || !['pre_flop', 'flop', 'turn', 'river'].includes(state.game_state) || state.game_state === 'showdown');
-            document.getElementById('rebuy-btn').style.display = isBusted ? 'block' : 'none';
+            const betweenHands = !['pre_flop', 'flop', 'turn', 'river'].includes(state.game_state);
+            const rebuyButton = document.getElementById('rebuy-btn');
+            rebuyButton.style.display = me && betweenHands && !state.practice && (state.game_mode === 'cash' || isBusted) ? 'block' : 'none';
+            rebuyButton.textContent = state.game_mode === 'tournament' ? '💰 Re-entry' : '💰 重新買入／補碼';
 
             // 房主按鈕
             const isWaiting = state.game_state === 'waiting_for_players' || state.game_state === 'game_over';
@@ -961,8 +1017,9 @@
             document.getElementById('next-btn').style.display = (isRoundEnd && state.game_state !== 'game_over' && state.game_state !== 'showdown') ? 'block' : 'none';
 
             if (state.turn_deadline > 0) {
-                startTimerUI(state.turn_deadline);
+                startTimerUI(state);
             } else {
+                turnClock.accept(state);
                 if (timerInterval) clearInterval(timerInterval);
                 document.getElementById('turn-timer-display').textContent = '';
             }

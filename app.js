@@ -346,7 +346,7 @@ class TexasHoldemGame {
     }
 
     startGame() {
-        if (this.gameState !== 'waiting_for_players') return [false, "無法開始"];
+        if (this.gameState !== 'waiting_for_players' && !(this.gameMode === 'cash' && this.gameState === 'game_over')) return [false, "無法開始"];
         if (this.playersOrder.length < 2) return [false, "人數不足"];
 
         this.messages.push("遊戲開始！");
@@ -568,6 +568,7 @@ class TexasHoldemGame {
     }
 
     playerAction(userId, action, amount = 0) {
+        if (this.scheduledAction?.kind === 'runout') return [false, '正在發出剩餘公共牌，無須行動'];
         if (!['pre_flop', 'flop', 'turn', 'river'].includes(this.gameState) || !this.getCurrentPlayer() || userId !== this.getCurrentPlayer().userId) return [false, '不輪到你'];
         const player = this.players[userId];
         let success = false;
@@ -658,13 +659,21 @@ class TexasHoldemGame {
         if (this.turnTimeout) clearTimeout(this.turnTimeout);
         this.turnTimeout = null;
         this.scheduledAction = null;
+        this.turnDeadline = 0;
     }
 
     scheduleAction(kind, delay) {
         this.cancelScheduledAction();
         this.scheduledAction = { kind, due: Date.now() + delay, hand: this.handNumber,
             street: this.gameState, playerId: this.getCurrentPlayer()?.userId };
-        this.turnTimeout = setTimeout(() => this.advanceDueAction(), delay);
+        if (kind === 'turn') {
+            this.turnSequence = (this.turnSequence || 0) + 1;
+            this.turnDeadline = this.scheduledAction.due;
+        }
+        const scheduled = this.scheduledAction;
+        this.turnTimeout = setTimeout(() => {
+            if (this.scheduledAction === scheduled) this.advanceDueAction();
+        }, delay);
     }
 
     // HTTP synchronization also drives overdue work when a host suspends timers.
@@ -693,7 +702,6 @@ class TexasHoldemGame {
         if (!currentPlayer || !currentPlayer.canBet()) return;
         if (!this.practice || currentPlayer.isBot) {
             const delay = currentPlayer.isBot ? 3000 : 20000;
-            this.turnDeadline = Date.now() + delay;
             this.scheduleAction('turn', delay);
         }
         broadcastState(this.gameId);
@@ -976,6 +984,7 @@ class TexasHoldemGame {
 
     toJSON(userId) {
         this.snapshotVersion = (this.snapshotVersion || 0) + 1;
+        const serverTime = Date.now();
         return {
             snapshot_version: this.snapshotVersion,
             viewer_id: userId,
@@ -986,6 +995,7 @@ class TexasHoldemGame {
             practice: this.practice ? { id: this.practice.id, title: this.practice.title, prompt: this.practice.prompt, lesson: this.currentHand?.finished ? this.practice.lesson : null } : null,
             game_id: this.gameId,
             game_mode: this.gameMode,
+            rebuy_default: this.initialChips,
             game_state: this.gameState,
             tournament_info: this.tournamentManager ? {
                 level: this.tournamentManager.getCurrentBlind().level,
@@ -999,6 +1009,9 @@ class TexasHoldemGame {
             pot: this.pot,
             current_bet_amount: this.currentBetAmount,
             turn_deadline: this.turnDeadline,
+            server_time: serverTime,
+            turn_remaining_ms: Math.max(0, this.turnDeadline - serverTime),
+            turn_id: this.scheduledAction?.kind === 'turn' ? this.turnSequence : null,
             min_raise: this.currentBetAmount + this.lastRaiseAmount,
             community_cards: this.communityCards.map(c => c.toString()),
             current_player_id: ['pre_flop','flop','turn','river'].includes(this.gameState) && this.scheduledAction?.kind !== 'runout' && this.getCurrentPlayer()?.canBet() ? this.getCurrentPlayer().userId : null,
@@ -1080,6 +1093,10 @@ app.post('/rebuy', (req, res) => {
     const p = game.players[user_id];
     if (!p) return res.json({ success: false });
 
+    if (['pre_flop', 'flop', 'turn', 'river'].includes(game.gameState)) {
+        return res.status(409).json({ success: false, message: '請等本手結束後再重新買入' });
+    }
+
     if (game.tournamentManager) {
         if (p.chips === 0) {
             const status = game.tournamentManager.handlePlayerBust(user_id, Object.keys(game.players).length);
@@ -1099,7 +1116,10 @@ app.post('/rebuy', (req, res) => {
         }
     }
 
-    const a = parseInt(amount) || 1000;
+    const a = (typeof amount === 'number' || (typeof amount === 'string' && amount.trim())) ? Number(amount) : NaN;
+    if (!Number.isSafeInteger(a) || a <= 0 || !Number.isSafeInteger(p.chips + a)) {
+        return res.status(400).json({ success: false, message: '買入金額必須是有效的正整數' });
+    }
     p.chips += a;
     p.sittingOut = false;
     game.messages.push(`${p.name} 買入了 ${a}`);
@@ -1124,6 +1144,9 @@ app.post('/game_action', (req, res) => {
     if (action === 'next_round') {
         game.startNewRound();
         return res.json({ success: true, game_state: game.toJSON(user_id) });
+    }
+    if (req.body.expected_action_count !== undefined && req.body.expected_action_count !== game.actionCount) {
+        return res.status(409).json({ success: false, message: '牌局已更新，請依目前回合重新操作', game_state: game.toJSON(user_id) });
     }
     const [ok, msg] = game.playerAction(user_id, action, amount);
     res.json({ success: ok, message: msg, game_state: game.toJSON(user_id) });

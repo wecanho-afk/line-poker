@@ -1,4 +1,12 @@
 :root { color-scheme: dark; --gold:#e3ba73; --surface:#121d2b; --line:#2a3b50; }
+#rebuy-dialog { width:min(90vw,380px);padding:24px;background:#121d2b;color:#eaf0f6;border:1px solid #4a6079;border-radius:14px; }
+#rebuy-dialog::backdrop { background:#000a; }
+#rebuy-dialog h2 { margin-top:0; }
+#rebuy-dialog p { line-height:1.6; }
+#rebuy-dialog label { display:block;margin-bottom:8px; }
+#rebuy-amount { width:100%;background:#09121e;color:white;border:1px solid #46607e; }
+#rebuy-error { color:#ff9ba7; }
+.rebuy-actions { display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap; }
 * { box-sizing:border-box; }
 body { background:radial-gradient(ellipse at top,#182d42,#090f18 65%); font-family:Inter,'Noto Sans TC','Segoe UI',sans-serif; color:#eaf0f6; height:100dvh; }
 button,input,select { font:inherit; }
