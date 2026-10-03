@@ -3,7 +3,7 @@
 <head>
     <title>W撲克 - 德州撲克</title>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover">
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <style>
@@ -196,6 +196,7 @@
         .modal-content { background: #333; padding: 25px; border-radius: 10px; text-align: center; max-width: 80%; }
     </style>
 <link rel="stylesheet" href="/poker-pro.css">
+<link rel="stylesheet" href="/poker-layout.css">
 <script src="/turn-clock.js"></script>
 </head>
 <body>
@@ -216,7 +217,7 @@
     <div class="container">
         <section id="pro-panel" class="workspace-panel" hidden></section>
         <div id="setup-view" class="card-box" style="text-align: center;">
-            <h2>歡迎來到牌桌</h2>
+            <div class="eyebrow">W POKER CLUB · 德州撲克</div><h2>每一手，都是新的可能。</h2><p class="lobby-intro">與好友入座，或從經典場景磨練你的決策。</p>
             <div style="margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; align-items: center;">
                 <button class="btn-green" id="line-login-btn" style="display: none; width: 80%;" onclick="liff.login()">登入 LINE 帳號</button>
                 <input type="text" id="playerNameInput" placeholder="輸入你的暱稱" style="width: 80%; font-size: 1.1em; padding: 10px; border-radius: 5px; border: 1px solid #777; background: #333; color: white; text-align: center;">
@@ -310,8 +311,8 @@
 
     <div class="controls" id="game-controls" style="display: none;">
         <div style="display: flex; gap: 5px; justify-content: center; width: 100%; flex-wrap: wrap;">
-            <button class="btn-red" onclick="performAction('fold')">蓋牌</button>
-            <button class="btn-blue" onclick="performAction('check')">讓牌</button>
+            <button class="btn-red" onclick="performAction('fold')">棄牌</button>
+            <button class="btn-blue" onclick="performAction('check')">過牌</button>
             <button class="btn-blue" onclick="performAction('call')">跟注</button>
         </div>
         <div style="display: flex; gap: 5px; justify-content: center; width: 100%; flex-wrap: wrap; margin-top: 5px;">
@@ -322,7 +323,7 @@
             <button class="btn-gold" style="padding: 8px 12px; font-size: 0.8em;" onclick="setQuickBet('allin')">All In</button>
         </div>
             <div style="display: flex; gap: 5px; justify-content: center; width: 100%; margin-top: 5px;">
-                <input type="number" id="raiseAmount" placeholder="加注額">
+                <input type="number" id="raiseAmount" placeholder="加注至" aria-label="加注至總額" inputmode="numeric">
                 <button class="btn-green" onclick="performAction('raise')">加注</button>
             </div>
         </div>
@@ -602,7 +603,7 @@
         function copyInviteLink() {
             try {
                 // 恢復使用 LIFF 專屬網址，這樣才能做到無縫登入
-                const link = LIFF_ID 
+                const link = window.location.hostname === "line-poker.onrender.com" && LIFF_ID 
                     ? `https://liff.line.me/${LIFF_ID}?room=${gameId}` 
                     : `${window.location.origin + window.location.pathname}?room=${gameId}`;
                 
@@ -977,7 +978,7 @@
                 let winBadge = '';
                 if (state.game_state === 'showdown' && state.winners && state.winners.includes(p.user_id)) {
                     winnerClass = 'box-shadow: 0 0 20px 10px rgba(255, 215, 0, 0.8); border-color: gold;';
-                    winBadge = `<div style="position:absolute; bottom:-20px; left:50%; transform:translateX(-50%); background:linear-gradient(45deg, #e74c3c, #c0392b); color:gold; padding:2px 8px; border-radius:5px; font-weight:900; font-size:0.8em; border:1px solid gold; z-index:30; text-shadow: 1px 1px 1px black; white-space:nowrap;">🏆 WINNER</div>`;
+                    winBadge = `<div class="winner-badge" style="position:absolute; bottom:-20px; left:50%; transform:translateX(-50%); background:linear-gradient(45deg, #e74c3c, #c0392b); color:gold; padding:2px 8px; border-radius:5px; font-weight:900; font-size:0.8em; border:1px solid gold; z-index:30; text-shadow: 1px 1px 1px black; white-space:nowrap;">🏆 WINNER</div>`;
                 }
 
                 div.innerHTML = `
@@ -1085,5 +1086,6 @@
     </script>
 <script src="/hand-cache.js"></script>
 <script src="/poker-pro.js"></script>
+<script src="/poker-layout.js"></script>
 </body>
 </html>

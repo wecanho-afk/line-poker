@@ -61,8 +61,13 @@ function startStateSync() {
     window.addEventListener('online', sync);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) sync(); });
 }
-try { historyKey = localStorage.getItem('poker-history-key'); if(!historyKey) { historyKey = crypto.randomUUID(); localStorage.setItem('poker-history-key',historyKey); } }
-catch { historyKey = crypto.randomUUID(); }
+// LAN previews may use HTTP, where randomUUID is unavailable. Keep a cryptographic key.
+function createHistoryKey() {
+    if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+    return Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2,'0')).join('');
+}
+try { historyKey = localStorage.getItem('poker-history-key'); if(!historyKey) { historyKey = createHistoryKey(); localStorage.setItem('poker-history-key',historyKey); } }
+catch { historyKey = createHistoryKey(); }
 function escapeHTML(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function proUpdate(state) {
     proState = state;
