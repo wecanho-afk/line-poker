@@ -939,7 +939,7 @@
                 }
                 
                 let cardsHtml = '';
-                if (!p.folded && p.hand && p.hand.length > 0) {
+                if ((!p.folded || p.shown_card_indexes?.length || (p.user_id === userId && p.can_show_cards)) && p.hand && p.hand.length > 0) {
                     const knownHand = knownPlayerCards[p.user_id] || [];
                     const renderedHand = p.hand.map((c, idx) => {
                         const isNew = idx >= knownHand.length || knownHand[idx] !== c;

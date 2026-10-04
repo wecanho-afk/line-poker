@@ -80,6 +80,7 @@ class Player {
         this.name = name;
         this.chips = chips;
         this.hand = [];
+        this.shownCardIndexes = [];
         this.currentBet = 0;
         this.folded = false;
         this.allIn = false;
@@ -92,6 +93,7 @@ class Player {
     }
     resetForNewRound() {
         this.hand = [];
+        this.shownCardIndexes = [];
         this.currentBet = 0;
         this.folded = false;
         this.allIn = false;
@@ -982,6 +984,24 @@ class TexasHoldemGame {
         }
     }
 
+    canShowCards(player) {
+        return !!player && !player.leftTable && !player.isBot && player.hand.length === 2 &&
+            !!this.currentHand?.finished && ['showdown','waiting_for_next_round','game_over'].includes(this.gameState);
+    }
+
+    showCards(userId, handNumber, indexes) {
+        const player = this.players[userId];
+        if (handNumber !== this.handNumber) return [false, '這手牌已結束，請重新確認目前牌局'];
+        if (!this.canShowCards(player)) return [false, '只能在本手結束後秀自己的牌'];
+        if (!Array.isArray(indexes) || indexes.length < 1 || indexes.length > 2 ||
+            indexes.some(i => !Number.isInteger(i) || i < 0 || i > 1) || new Set(indexes).size !== indexes.length) {
+            return [false, '請選擇一張或兩張手牌'];
+        }
+        // Reveals are cumulative and cannot be retracted after another player has seen them.
+        player.shownCardIndexes = [...new Set([...(player.shownCardIndexes || []), ...indexes])].sort();
+        return [true, '已秀牌'];
+    }
+
     getHostId() {
         return this.playersOrder.find(id => !this.players[id].sittingOut && !this.players[id].isBot) || this.playersOrder[0];
     }
@@ -1029,7 +1049,7 @@ class TexasHoldemGame {
             bb_id: this.bigBlindId,
             players: this.playersOrder.map(id => {
                 const p = this.players[id];
-                const showCards = p.userId === userId || (this.gameState === 'showdown' && !p.folded && this.activePlayersInRound.length > 1);
+                const showCards = p.userId === userId || (this.gameState === 'showdown' && !p.folded && this.activePlayersInRound.filter(id => !this.players[id].folded).length > 1);
                 return {
                     user_id: p.userId,
                     bot_style: p.isBot ? p.personality?.label : null,
@@ -1043,7 +1063,9 @@ class TexasHoldemGame {
                     all_in: p.allIn,
                     last_action: p.lastAction,
                     is_current_player: p.userId === (this.getCurrentPlayer() ? this.getCurrentPlayer().userId : null),
-                    hand: showCards ? p.hand.map(c => c.toString()) : (p.hand.length > 0 ? ['??', '??'] : [])
+                    shown_card_indexes: p.shownCardIndexes || [],
+                    can_show_cards: p.userId === userId && this.canShowCards(p),
+                    hand: p.hand.map((c, index) => showCards || (p.shownCardIndexes || []).includes(index) ? c.toString() : '??')
                 };
             })
         };
@@ -1118,6 +1140,15 @@ app.post('/add_bot', (req, res) => {
     const [ok, msg] = game.addBot();
     res.json({ success: ok, message: msg, game_state: game.toJSON(user_id) });
     if (ok) broadcastState(game_id); // Broadcast when bot added
+});
+
+app.post('/show_cards', (req, res) => {
+    const { game_id, user_id, hand_number, card_indexes } = req.body;
+    const game = GAMES[game_id];
+    if (!game) return res.status(404).json({success:false, message:'房號不存在'});
+    const [success, message] = game.showCards(user_id, hand_number, card_indexes);
+    res.status(success ? 200 : 409).json({success, message, game_state:game.toJSON(user_id)});
+    if (success) broadcastState(game_id);
 });
 
 app.post('/rebuy', (req, res) => {

@@ -30,9 +30,48 @@
     field.before(wrap);wrap.append(caption,field);
   });
   const shortcut=document.createElement('button');shortcut.className='practice-shortcut';shortcut.textContent='先練一手 → 場景練習';shortcut.onclick=()=>showProView('practice');byId('setup-view').append(shortcut);
+  const reveal = document.createElement('section');
+  reveal.id='show-cards-panel'; reveal.hidden=true;
+  reveal.innerHTML='<strong>本手結束 · 秀牌</strong><p>選一張或兩張公開給全桌，公開後無法收回。</p><div class="show-card-actions"></div><p id="show-cards-status" role="status"></p>';
+  byId('game-controls').after(reveal);
+  let revealBusy=false;
+  async function showSelectedCards(indexes, handNumber) {
+    if(revealBusy)return;
+    revealBusy=true;
+    reveal.querySelectorAll('button').forEach(b=>b.disabled=true);
+    const requestedGame=gameId;
+    try {
+      const result=await api('/show_cards','POST',{game_id:requestedGame,user_id:userId,hand_number:handNumber,card_indexes:indexes});
+      if(gameId!==requestedGame)return;
+      if(result.game_state)updateUI(result.game_state);
+      if(!result.success)byId('show-cards-status').textContent=result.message||'秀牌未成功，請重試';
+    } catch {
+      if(gameId===requestedGame)byId('show-cards-status').textContent='連線中斷，請確認秀牌狀態後重試';
+    } finally {
+      revealBusy=false;
+      if(proState && gameId===requestedGame)renderReveal(proState);
+    }
+  }
+  function renderReveal(state) {
+    const me=state.players.find(p=>p.user_id===userId);
+    reveal.hidden=!me?.can_show_cards;
+    if(reveal.hidden)return;
+    const shown=me.shown_card_indexes||[];
+    const actions=reveal.querySelector('.show-card-actions');actions.replaceChildren();
+    const handNumber=state.hand_number;
+    me.hand.forEach((card,index)=>{
+      const button=document.createElement('button');button.className='show-one-card';
+      button.innerHTML=formatCard(card)+'<span>'+ (shown.includes(index)?'已公開':'秀這張')+'</span>';
+      button.setAttribute('aria-label',(shown.includes(index)?'已公開':'秀出')+'第'+(index+1)+'張 '+card);
+      button.disabled=revealBusy||shown.includes(index);button.onclick=()=>showSelectedCards([index],handNumber);actions.append(button);
+    });
+    const both=document.createElement('button');both.className='btn-gold';both.textContent=shown.length===2?'兩張已公開':'秀兩張';
+    both.disabled=revealBusy||shown.length===2;both.onclick=()=>showSelectedCards([0,1],handNumber);actions.append(both);
+  }
   const originalUpdate=proUpdate;
   proUpdate=function(state){
     originalUpdate(state);
+    renderReveal(state);
     const active=['pre_flop','flop','turn','river'].includes(state.game_state);
     const mine=state.current_player_id===userId && active;
     byId('action-status').textContent=mine?'輪到你了':active?'等待對手行動':streetLabels[state.game_state]||'準備入座';
