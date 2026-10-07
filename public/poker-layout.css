@@ -189,3 +189,29 @@ body.allin-hand .action-rail { border-color:#976c46; }
 #my-hand-strength strong { display:block;color:#efdab2;font-size:15px;margin:3px 0;overflow-wrap:anywhere; }
 @media(min-width:600px) and (max-height:600px) { #my-hand-strength { padding:5px 7px; }#my-hand-strength strong { font-size:13px;margin:1px 0; }#my-hand-strength small { display:none; } }
 .header #music-toggle { padding:4px 8px;font-size:11px!important;min-height:28px; }
+.action-scroll { display:flex;flex-direction:column;gap:12px;min-height:0;flex:1; }
+#music-player-panel { flex-shrink:0;width:100%;min-width:200px;background:#0b1715;border:1px solid #526049;border-radius:8px;padding:0;overflow:hidden; }
+.music-player-frame { width:100%;height:200px;min-width:200px; }
+.music-player-frame iframe { width:100%;height:200px;border:0;display:block; }
+.music-player-footer { display:flex;align-items:center;justify-content:space-between;gap:4px;padding:4px 6px;font-size:10px; }
+.music-player-footer button { min-height:28px;padding:3px 6px;color:#eee;background:#294335;font-size:11px;flex-shrink:0; }
+.music-privacy { display:block;padding:0 6px 4px;font-size:9px;color:#a0b5ac; }.music-privacy a { color:inherit; }
+.container>#music-player-panel { width:300px;max-width:100%;margin-bottom:16px; }
+body.playing.music-open .action-rail { overflow:hidden; }
+body.playing.music-open .action-scroll { overflow-y:auto;min-height:60px;gap:7px;padding-bottom:8px; }
+@media(min-width:600px) and (max-height:600px){
+ body.playing.music-open #game-view { grid-template-columns:minmax(0,1fr) 214px; }
+ body.playing.music-open .action-rail { padding:5px;gap:5px; }
+ body.playing.music-open #music-player-panel { border:0; }
+ body.playing.music-open .music-privacy { display:none; }
+ body.playing.music-open .music-player-footer { padding:2px 3px; }
+ body.playing.music-open .music-player-footer button { min-height:24px; }
+ .action-scroll { gap:7px;flex-shrink:0; }
+ body.playing.music-open .action-scroll { flex-shrink:1; }
+}
+@media(max-width:599px),(max-width:900px) and (orientation:portrait){
+ body.playing.music-open .action-scroll { max-height:300px; }
+}
+.action-scroll>* { flex-shrink:0; }
+body.playing.music-open #game-controls { order:-1; }
+@media(min-width:600px) and (max-height:374px){body.playing.music-open #game-view { min-height:300px;height:auto; }}
