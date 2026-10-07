@@ -581,6 +581,7 @@ class TexasHoldemGame {
         if (action === 'raise' && (!Number.isSafeInteger(amount) || amount <= this.currentBetAmount)) return [false, '加注總額必須為有效整數且高於目前下注'];
         if (action === 'raise' && player.hasActed && this.currentBetAmount - (player.actedAtBet || 0) < this.lastRaiseAmount) return [false, '不足額全下尚未重新開放加注'];
         if (action === 'raise' && !this.activePlayersInRound.some(id => id !== userId && this.players[id].canBet())) return [false, '沒有可跟注的對手'];
+        const displayAction = action === 'raise' && this.currentBetAmount === 0 ? 'bet' : action;
         const event = history.capture(this, player, action, amount);
 
         if (action === 'fold') {
@@ -622,7 +623,7 @@ class TexasHoldemGame {
             this.pot += totalToPutIn;
             this.currentBetAmount = amount;
             if (player.chips === 0) player.allIn = true;
-            msg = `${player.name} 加注至 $${amount}`;
+            msg = `${player.name} ${displayAction === 'bet' ? '下注 Bet' : '加注 Raise 至'} ${amount}`;
             success = true;
 
             // Everyone else needs to act again to match the new bet
@@ -636,9 +637,9 @@ class TexasHoldemGame {
             player.hasActed = true;
             player.actedAtBet = this.currentBetAmount;
             history.record(this, event);
-            player.lastAction = action;
+            player.lastAction = displayAction;
             this.actionCount++;
-            this.latestVoice = player.allIn ? 'all in' : action;
+            this.latestVoice = player.allIn ? 'all in' : displayAction;
             this.messages.push(msg);
             
             if (this.checkEndBetting()) {

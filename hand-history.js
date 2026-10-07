@@ -24,7 +24,7 @@ function begin(game) {
 function capture(game, player, action, amount) {
     const c = strategy.context(game, player);
     return { playerId: player.userId, name: player.name, street: game.gameState, board: c.board, pot: c.pot,
-        stack: c.stack, call: c.call, position: c.positionLabel, action, amount: action === 'raise' ? amount : action === 'call' ? c.call : 0,
+        stack: c.stack, call: c.call, position: c.positionLabel, action, display_action: action === 'raise' && game.currentBetAmount === 0 ? 'bet' : action, amount: action === 'raise' ? amount : action === 'call' ? c.call : 0,
         context: player.isBot ? null : c };
 }
 function record(game, event) { if (game.currentHand && !game.currentHand.finished) game.currentHand.actions.push(event); }

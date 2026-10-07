@@ -813,12 +813,6 @@
                 amount = Math.round(parseFloat(document.getElementById('raiseAmount').value));
                 if (!amount || amount <= 0) return alert('請輸入加注金額');
             }
-            if (action === 'raise' && amount >= (window.myChips + window.myCurrentBet)) {
-                // 如果是 All-In，播放戰鼓音效
-                const audio = new Audio('https://www.soundjay.com/misc/sounds/drum-roll-1.mp3');
-                audio.volume = 0.5;
-                audio.play().catch(e => console.error("Audio play failed:", e));
-            }
             const res = await api('/game_action', 'POST', {
                 game_id: gameId,
                 user_id: userId,
@@ -957,7 +951,8 @@
                 else if (p.all_in) statusStr = '全下';
                 else if (p.last_action === 'check') statusStr = '過牌';
                 else if (p.last_action === 'call') statusStr = `跟注 $${p.current_bet}`;
-                else if (p.last_action === 'raise') statusStr = `加注 $${p.current_bet}`;
+                else if (p.last_action === 'bet') statusStr = `Bet ${p.current_bet}`;
+                else if (p.last_action === 'raise') statusStr = `Raise ${p.current_bet}`;
                 else if (p.current_bet > 0) statusStr = `$${p.current_bet}`;
 
                 let avatarHtml = '👤';
@@ -1087,5 +1082,7 @@
 <script src="/hand-cache.js"></script>
 <script src="/poker-pro.js"></script>
 <script src="/poker-layout.js"></script>
+<script src="/hand-strength.js"></script>
+<script src="/poker-atmosphere.js"></script>
 </body>
 </html>
