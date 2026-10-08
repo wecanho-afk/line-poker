@@ -12,8 +12,8 @@ test('player style derives standard recent-hand indicators without opponent acti
  assert.deepEqual(values,{vpip:75,pfr:25,aggression:17,showdown:50,win:50,alignment:90});
  assert.equal(report.totalNet,100);assert.equal(report.averageNet,25);assert.equal(report.hands,4);assert.equal(report.archetype,'資料累積中');
 });
-test('player style caps analysis at the most recent 100 hands and handles empty data',()=>{
+test('player style caps analysis at the most recent 500 hands and handles empty data',()=>{
  const empty=analyze([]);assert.equal(empty.hands,0);assert.ok(empty.metrics.every(m=>m.value===0));
- const many=Array.from({length:120},(_,i)=>({net:i<100?1:-100,board:[],actions:[action('pre_flop','raise')]}));
- const report=analyze(many);assert.equal(report.hands,100);assert.equal(report.totalNet,100);assert.equal(report.metrics[0].value,100);assert.equal(report.metrics[1].value,100);
+ const many=Array.from({length:620},(_,i)=>({net:i<500?1:-100,board:[],actions:[action('pre_flop','raise')]}));
+ const report=analyze(many);assert.equal(report.hands,500);assert.equal(report.limit,500);assert.equal(report.totalNet,500);assert.equal(report.metrics[0].value,100);assert.equal(report.metrics[1].value,100);
 });

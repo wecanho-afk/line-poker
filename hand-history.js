@@ -6,9 +6,10 @@ const clone = value => JSON.parse(JSON.stringify(value));
 const directory = () => process.env.POKER_HISTORY_DIR || path.join(__dirname, '.data', 'hands');
 const filename = id => path.join(directory(), createHash('sha256').update(String(id)).digest('hex') + '.json');
 const recent = new Map();
+const HISTORY_LIMIT = 500;
 function merge(...groups) {
     return [...new Map(groups.flat().map(h => [h.id, h])).values()]
-        .sort((a,b) => b.started.localeCompare(a.started)).slice(0,100);
+        .sort((a,b) => b.started.localeCompare(a.started)).slice(0,HISTORY_LIMIT);
 }
 function read(id) {
     const memory = recent.get(id) || [];

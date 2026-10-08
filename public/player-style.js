@@ -1,8 +1,9 @@
 (function(root,factory){if(typeof module==='object'&&module.exports)module.exports=factory();else root.PokerPlayerStyle=factory();})(typeof globalThis!=='undefined'?globalThis:this,function(){
+ const HISTORY_LIMIT=500;
  const streets=new Set(['flop','turn','river']);
  const rate=(n,d)=>d?Math.round(n/d*100):0;
  function analyze(source){
-  const hands=(Array.isArray(source)?source:[]).filter(h=>h&&Array.isArray(h.actions)).slice(0,100);
+  const hands=(Array.isArray(source)?source:[]).filter(h=>h&&Array.isArray(h.actions)).slice(0,HISTORY_LIMIT);
   let vpipHands=0,pfrHands=0,wins=0,showdowns=0,postflopActions=0,aggressiveActions=0,decisions=0,aligned=0,totalNet=0;
   for(const hand of hands){
    const mine=hand.actions.filter(a=>a?.mine);
@@ -45,7 +46,7 @@
    else notes.push('手牌回顧中仍有可檢討的行動，優先查看大底池與轉牌、河牌決策。');
    if(showdowns>0&&metrics[4].value<30)notes.push('進入攤牌後的獲利手牌偏少，可回顧跟注到底的牌力與賠率。');
   }
-  return {hands:count,metrics,totalNet,averageNet:count?Math.round(totalNet/count*10)/10:0,wins,showdowns,decisions,aligned,archetype,summary,notes,confidence:Math.min(100,Math.round(count/30*100))};
+  return {hands:count,limit:HISTORY_LIMIT,metrics,totalNet,averageNet:count?Math.round(totalNet/count*10)/10:0,wins,showdowns,decisions,aligned,archetype,summary,notes,confidence:Math.min(100,Math.round(count/100*100))};
  }
  return {analyze};
 });

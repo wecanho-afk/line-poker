@@ -4,9 +4,10 @@ let proState = null, proView = 'table', reviewHands = [], selectedHand = 0, sele
 let historyKey;
 const handSaveStates = new Map();
 let historyNotice = '', historyLoadVersion = 0;
+const HISTORY_LIMIT = 500;
 const cacheOwner = () => userId + ':' + historyKey;
 function mergeReviews(...groups) {
-    return [...new Map(groups.flat().map(h=>[h.id,h])).values()].sort((a,b)=>b.started.localeCompare(a.started)).slice(0,100);
+    return [...new Map(groups.flat().map(h=>[h.id,h])).values()].sort((a,b)=>b.started.localeCompare(a.started)).slice(0,HISTORY_LIMIT);
 }
 function updateHandSaveStatus(state) {
     let el=document.getElementById('hand-save-status');
@@ -147,7 +148,7 @@ async function loadHistory() {
 }
 function renderHistory() {
     const panel=document.getElementById('pro-panel');
-    panel.innerHTML='<div class="panel-top"><div><h2>手牌回顧</h2><div class="muted">最近 100 手 · 僅顯示你的底牌與當時可見資訊</div></div><button id="reload-history">重新整理</button></div><p class="muted" role="status">'+escapeHTML(historyNotice)+'</p>';
+    panel.innerHTML='<div class="panel-top"><div><h2>手牌回顧</h2><div class="muted">最近 500 手 · 僅顯示你的底牌與當時可見資訊</div></div><button id="reload-history">重新整理</button></div><p class="muted" role="status">'+escapeHTML(historyNotice)+'</p>';
     document.getElementById('reload-history').onclick=loadHistory;
     if(!reviewHands.length) { panel.innerHTML+='<div class="empty-state">還沒有已完成的手牌。<br>打一手牌或完成場景練習，這裡就會出現逐步回顧。</div>';return; }
     panel.innerHTML+='<div class="history-layout"><div class="hand-list" aria-label="手牌清單">'+reviewHands.map((h,i)=>`<button data-hand="${i}" class="${i===selectedHand?'selected':''}">第 ${h.number} 手 · ${escapeHTML(h.hand.join(' '))}<br><span class="${h.net>=0?'positive':'negative'}">${h.net>=0?'+':''}${h.net}</span> · ${escapeHTML(h.scenario?.title||h.gameId)}<br><small>${escapeHTML(new Date(h.started).toLocaleString())}</small></button>`).join('')+'</div><article class="review-card" id="review-detail"></article></div>';
@@ -172,11 +173,11 @@ function radarMarkup(metrics) {
 }
 function renderPlayerStyle(hands,notice) {
     const panel=document.getElementById('pro-panel'),report=PokerPlayerStyle.analyze(hands);
-    panel.innerHTML=`<div class="panel-top"><div><h2>牌手風格</h2><div class="muted">依最近 ${report.hands} / 100 手分析 · 僅使用你的行動與結果</div></div><button id="reload-style">重新整理</button></div><p class="muted" role="status">${escapeHTML(notice)}</p>`;
+    panel.innerHTML=`<div class="panel-top"><div><h2>牌手風格</h2><div class="muted">依最近 ${report.hands} / ${report.limit} 手分析 · 僅使用你的行動與結果</div></div><button id="reload-style">重新整理</button></div><p class="muted" role="status">${escapeHTML(notice)}</p>`;
     document.getElementById('reload-style').onclick=loadPlayerStyle;
     if(!report.hands){panel.innerHTML+='<div class="empty-state">還沒有足夠的牌局資料。<br>完成一般牌局或場景練習後，這裡會開始建立你的風格雷達圖。</div>';return;}
     const signed=report.totalNet>=0?'+'+report.totalNet:String(report.totalNet),avg=report.averageNet>=0?'+'+report.averageNet:String(report.averageNet);
-    panel.innerHTML+=`<section class="style-hero"><div class="style-profile"><span class="style-kicker">近期主要風格</span><h3>${escapeHTML(report.archetype)}</h3><p>${escapeHTML(report.summary)}</p><div class="confidence"><span>分析可信度</span><strong>${report.confidence}%</strong><i><b style="width:${report.confidence}%"></b></i><small>累積 30 手後較穩定</small></div></div><div class="radar-wrap">${radarMarkup(report.metrics)}</div></section>`;
+    panel.innerHTML+=`<section class="style-hero"><div class="style-profile"><span class="style-kicker">近期主要風格</span><h3>${escapeHTML(report.archetype)}</h3><p>${escapeHTML(report.summary)}</p><div class="confidence"><span>分析可信度</span><strong>${report.confidence}%</strong><i><b style="width:${report.confidence}%"></b></i><small>累積 100 手後較穩定，最多分析 500 手</small></div></div><div class="radar-wrap">${radarMarkup(report.metrics)}</div></section>`;
     panel.innerHTML+=`<div class="style-summary"><div><span>分析手數</span><strong>${report.hands}</strong></div><div><span>總盈虧</span><strong class="${report.totalNet>=0?'positive':'negative'}">${signed}</strong></div><div><span>每手平均</span><strong class="${report.averageNet>=0?'positive':'negative'}">${avg}</strong></div><div><span>獲利手牌</span><strong>${report.wins}</strong></div></div>`;
     panel.innerHTML+=`<section class="metric-grid" aria-label="牌手風格指標">${report.metrics.map(metric=>`<article><div><span>${escapeHTML(metric.short)}</span><strong>${metric.sample?metric.value+'%':'—'}</strong></div><h3>${escapeHTML(metric.label)}</h3><p>${escapeHTML(metric.help)}</p><small>${metric.sample?`樣本 ${metric.sample}`:'尚無可分析行動'}</small></article>`).join('')}</section>`;
     panel.innerHTML+=`<section class="style-insights"><h3>近期觀察</h3>${report.notes.map(note=>`<p>${escapeHTML(note)}</p>`).join('')}<small>風格分析描述近期行動模式，不代表固定打法，也不是勝率保證。</small></section>`;
