@@ -36,7 +36,7 @@ function finish(game) {
     game.historyError = false;
     for (const seat of hand.seats.filter(p => !p.bot)) {
         const review = { id: hand.id, number: hand.number, started: hand.started, gameId: hand.gameId, scenario: hand.scenario,
-            hand: seat.hand, board: game.communityCards.map(c => c.toString()), blinds: hand.blinds,
+            hand: seat.hand, board: game.communityCards.map(c => c.toString()), boards: game.runoutBoards?.length===2?game.runoutBoards.map(board=>board.map(String)):null, blinds: hand.blinds,
             pot: game.pot, net: game.players[seat.id].chips - seat.chips, winners: game.winners.map(id => game.players[id].name),
             actions: hand.actions.map(event => {
                 const { context, ...publicEvent } = event;

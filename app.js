@@ -90,6 +90,9 @@ class Player {
         this.hasActed = false; // New! Ensure they acted this round
         this.invested = 0; // Total invested in this hand
         this.avatar = '';
+        this.handsPlayed = 0;
+        this.timeCards = 0;
+        this.timeCardTurnId = null;
     }
     resetForNewRound() {
         this.hand = [];
@@ -100,6 +103,7 @@ class Player {
         this.lastAction = null;
         this.hasActed = false;
         this.invested = 0;
+        this.timeCardTurnId = null;
     }
     canBet() { return !this.folded && !this.allIn && !this.sittingOut && this.chips > 0; }
 }
@@ -240,6 +244,9 @@ class TexasHoldemGame {
         this.handSettled = false;
         this.actionCount = 0;
         this.latestVoice = '';
+        this.runoutDecision = null;
+        this.runoutBoards = null;
+        this.runoutCount = 1;
         this.turnDeadline = 0;
         this.turnTimeout = null;
         this.lastRaiseAmount = 20; // 追蹤上一次加注的增量，初始為大盲
@@ -365,6 +372,9 @@ class TexasHoldemGame {
         this.currentBetAmount = 0;
         this.winners = [];
         this.handSettled = false;
+        this.runoutDecision = null;
+        this.runoutBoards = null;
+        this.runoutCount = 1;
         
         if (this.tournamentManager) {
             this.tournamentManager.startTournament();
@@ -423,6 +433,11 @@ class TexasHoldemGame {
         }
 
         history.begin(this);
+        this.activePlayersInRound.forEach(id => {
+            const p=this.players[id];
+            p.handsPlayed=(p.handsPlayed||0)+1;
+            if(p.handsPlayed%50===0){p.timeCards=(p.timeCards||0)+1;this.messages.push(`${p.name} 完成 ${p.handsPlayed} 手，獲得 1 張 30 秒時間卡`);}
+        });
         this.activePlayersInRound.forEach(id => { if (this.players[id].personality) this.players[id].personality.handsPlayed++; });
 
         // Post Blinds
@@ -499,8 +514,97 @@ class TexasHoldemGame {
         this.scheduleAction('next', 4000);
     }
 
+    estimateRunoutEquities(contenders) {
+        const known=new Set([...this.communityCards,...contenders.flatMap(p=>p.hand)].map(String));
+        const available=Card.SUITS.flatMap(s=>Card.RANKS.map(r=>new Card(r,s))).filter(c=>!known.has(c.toString()));
+        const needed=5-this.communityCards.length,wins=new Map(contenders.map(p=>[p,0]));
+        const boards=[];
+        if(needed<=2){
+            const choose=(start,picked)=>{if(picked.length===needed){boards.push(picked);return;}for(let i=start;i<=available.length-(needed-picked.length);i++)choose(i+1,[...picked,available[i]]);};
+            choose(0,[]);
+        } else {
+            let seed=([...known].sort().join('')+this.gameId+this.handNumber).split('').reduce((n,c)=>Math.imul(n^c.charCodeAt(0),16777619)>>>0,2166136261);
+            for(let trial=0;trial<400;trial++){
+                const pool=[...available];
+                for(let i=0;i<needed;i++){seed=(Math.imul(seed,1664525)+1013904223)>>>0;const j=i+seed%(pool.length-i);[pool[i],pool[j]]=[pool[j],pool[i]];}
+                boards.push(pool.slice(0,needed));
+            }
+        }
+        for(const extra of boards){
+            const board=[...this.communityCards,...extra],scores=contenders.map(p=>this.evaluateHand([...p.hand,...board]).score),best=Math.max(...scores),tied=contenders.filter((_,i)=>scores[i]===best);
+            tied.forEach(p=>wins.set(p,wins.get(p)+1/tied.length));
+        }
+        return new Map(contenders.map(p=>[p,wins.get(p)/boards.length]));
+    }
+
+    beginRunoutDecision() {
+        const contenders=this.activePlayersInRound.map(id=>this.players[id]).filter(p=>!p.folded);
+        if(this.practice||contenders.length<2){this.startRunout(1);return;}
+        const equities=this.estimateRunoutEquities(contenders),ranked=[...contenders].sort((a,b)=>equities.get(a)-equities.get(b)||this.playersOrder.indexOf(a.userId)-this.playersOrder.indexOf(b.userId));
+        const proposer=ranked[0],decider=ranked.at(-1);
+        if(equities.get(decider)-equities.get(proposer)<.000001){this.messages.push('目前牌力平手，剩餘公共牌發一次');this.startRunout(1);return;}
+        this.runoutDecision={stage:'proposal',proposerId:proposer.userId,deciderId:decider.userId,proposedRuns:null};
+        this.messages.push(`${proposer.name} 目前落後，可提議剩餘公共牌發一次或兩次`);
+        this.scheduleRunoutChoice();
+    }
+
+    scheduleRunoutChoice() {
+        const choice=this.runoutDecision;if(!choice)return;
+        const actorId=choice.stage==='proposal'?choice.proposerId:choice.deciderId,actor=this.players[actorId];
+        this.scheduleAction('runout_choice',actor?.isBot?1000:20000,actorId);
+    }
+
+    chooseRunout(userId,runs) {
+        const choice=this.runoutDecision;
+        if(!choice||![1,2].includes(runs))return [false,'目前沒有可選擇的發牌次數'];
+        const actorId=choice.stage==='proposal'?choice.proposerId:choice.deciderId;
+        if(userId!==actorId)return [false,'尚未輪到你決定'];
+        this.cancelScheduledAction();
+        if(choice.stage==='proposal'){
+            choice.proposedRuns=runs;choice.stage='decision';
+            this.messages.push(`${this.players[userId].name} 提議剩餘公共牌發 ${runs} 次`);
+            this.actionCount++;this.scheduleRunoutChoice();
+            return [true,'已送出提議，等待領先者決定'];
+        }
+        this.messages.push(`${this.players[userId].name} 最後決定剩餘公共牌發 ${runs} 次`);
+        this.actionCount++;this.startRunout(runs);
+        return [true,`最後決定發 ${runs} 次`];
+    }
+
+    startRunout(runs=1) {
+        this.cancelScheduledAction();this.runoutDecision=null;this.runoutCount=runs;
+        this.runoutBoards=Array.from({length:runs},()=>[...this.communityCards]);
+        this.turnDeadline=0;this.scheduleAction('runout',900);
+    }
+
+    advanceRunout() {
+        if(!this.runoutBoards)this.runoutBoards=[[...this.communityCards]];
+        const current=this.runoutBoards[0].length,target=current===0?3:Math.min(5,current+1);
+        for(const board of this.runoutBoards)board.push(...this.deck.deal(target-board.length));
+        this.communityCards=[...this.runoutBoards[0]];
+        this.gameState=target===3?'flop':target===4?'turn':'river';
+        this.messages.push(this.runoutCount===2?`兩次發牌進行至${target===3?'翻牌':target===4?'轉牌':'河牌'}`:`發出${target===3?'翻牌':target===4?'轉牌':'河牌'}`);
+        if(target===5)this.determineWinner();else this.scheduleAction('runout',900);
+    }
+
+    useTimeCard(userId) {
+        const pending=this.scheduledAction,player=this.players[userId];
+        if(!player||pending?.kind!=='turn'||pending.playerId!==userId||this.getCurrentPlayer()?.userId!==userId)return [false,'只能在輪到自己時使用時間卡'];
+        if((player.timeCards||0)<1)return [false,'沒有可用的時間卡'];
+        if(player.timeCardTurnId===this.turnSequence)return [false,'本回合已使用過時間卡'];
+        if(pending.due<=Date.now())return [false,'本回合時間已結束'];
+        player.timeCards--;this.turnSequence=(this.turnSequence||0)+1;player.timeCardTurnId=this.turnSequence;pending.due+=30000;this.turnDeadline=pending.due;this.actionCount++;
+        if(this.turnTimeout)clearTimeout(this.turnTimeout);
+        const scheduled=pending;this.turnTimeout=setTimeout(()=>{if(this.scheduledAction===scheduled)this.advanceDueAction();},Math.max(0,pending.due-Date.now()));
+        this.messages.push(`${player.name} 使用 1 張時間卡，增加 30 秒`);
+        return [true,'已增加 30 秒'];
+    }
+
     endBettingRound() {
         if (!['pre_flop','flop','turn','river'].includes(this.gameState)) return;
+        if(this.scheduledAction?.kind==='runout'){
+            this.cancelScheduledAction();this.advanceRunout();return;
+        }
         this.cancelScheduledAction();
         this.returnUncalledBet('currentBet');
         this.messages.push("下注回合結束");
@@ -518,6 +622,12 @@ class TexasHoldemGame {
         this.activePlayersInRound = this.activePlayersInRound.filter(id => !this.players[id].folded);
 
         if (this.activePlayersInRound.length === 1) return this.endRoundSingleWinner();
+
+        const canActCount = this.activePlayersInRound.filter(id => !this.players[id].allIn).length;
+        if (canActCount <= 1 && this.communityCards.length < 5) {
+            this.beginRunoutDecision();
+            return;
+        }
 
         if (this.gameState === 'pre_flop') {
             this.gameState = 'flop';
@@ -554,15 +664,6 @@ class TexasHoldemGame {
             }
         }
 
-        const canActCount = this.activePlayersInRound.filter(id => !this.players[id].allIn).length;
-        if (canActCount <= 1) {
-             // Auto-deal remaining cards if everyone is all-in
-             broadcastState(this.gameId);
-             this.turnDeadline = 0;
-             this.scheduleAction('runout', 1500);
-             return;
-        }
-
         if (this.moveToNextPlayer()) {
             this.messages.push(`現在輪到 ${this.getCurrentPlayer().name} 行動。`);
             this.startTurnTimer();
@@ -571,6 +672,7 @@ class TexasHoldemGame {
 
     playerAction(userId, action, amount = 0) {
         if (this.scheduledAction?.kind === 'runout') return [false, '正在發出剩餘公共牌，無須行動'];
+        if (this.runoutDecision) return [false, '請先完成剩餘公共牌發牌次數的決定'];
         if (!['pre_flop', 'flop', 'turn', 'river'].includes(this.gameState) || !this.getCurrentPlayer() || userId !== this.getCurrentPlayer().userId) return [false, '不輪到你'];
         const player = this.players[userId];
         let success = false;
@@ -665,11 +767,11 @@ class TexasHoldemGame {
         this.turnDeadline = 0;
     }
 
-    scheduleAction(kind, delay) {
+    scheduleAction(kind, delay, playerId = null) {
         this.cancelScheduledAction();
         this.scheduledAction = { kind, due: Date.now() + delay, hand: this.handNumber,
-            street: this.gameState, playerId: this.getCurrentPlayer()?.userId };
-        if (kind === 'turn') {
+            street: this.gameState, playerId: playerId || this.getCurrentPlayer()?.userId };
+        if (kind === 'turn' || kind === 'runout_choice') {
             this.turnSequence = (this.turnSequence || 0) + 1;
             this.turnDeadline = this.scheduledAction.due;
         }
@@ -687,7 +789,11 @@ class TexasHoldemGame {
         this.cancelScheduledAction();
         if (pending.hand !== this.handNumber || pending.street !== this.gameState) return;
         if (pending.kind === 'next') this.prepareNext();
-        else if (pending.kind === 'runout') this.endBettingRound();
+        else if (pending.kind === 'runout') this.advanceRunout();
+        else if (pending.kind === 'runout_choice') {
+            const runs=this.runoutDecision?.stage==='decision'?(this.runoutDecision.proposedRuns||1):(this.players[pending.playerId]?.isBot?2:1);
+            this.chooseRunout(pending.playerId,runs);
+        }
         else {
             const player = this.getCurrentPlayer();
             if (!player || player.userId !== pending.playerId || !player.canBet()) return;
@@ -896,40 +1002,27 @@ class TexasHoldemGame {
         }
 
         const eligibleToWin = investors.filter(p => !p.folded);
-        const playerScores = new Map();
-        eligibleToWin.forEach(p => {
-            const evalResult = this.evaluateHand([...p.hand, ...this.communityCards]);
-            playerScores.set(p, { score: evalResult.score, desc: evalResult.desc });
-        });
-
-        const winnings = new Map();
-        let winnersList = [];
-
-        for (const pot of subPots) {
-            if (pot.eligiblePlayers.length === 0) continue;
-            let maxScore = -1;
-            for (const p of pot.eligiblePlayers) {
-                const score = playerScores.get(p).score;
-                if (score > maxScore) maxScore = score;
+        const boards=this.runoutBoards?.length?this.runoutBoards:[this.communityCards];
+        const winnings = new Map(),winnersList=[],boardMessages=[];
+        boards.forEach((board,boardIndex)=>{
+            const playerScores=new Map();
+            eligibleToWin.forEach(p=>playerScores.set(p,this.evaluateHand([...p.hand,...board])));
+            const boardWinnings=new Map();
+            for(const pot of subPots){
+                if(!pot.eligiblePlayers.length)continue;
+                const amount=boards.length===2?Math.floor(pot.amount/2)+(boardIndex===0?pot.amount%2:0):pot.amount;
+                if(!amount)continue;
+                const maxScore=Math.max(...pot.eligiblePlayers.map(p=>playerScores.get(p).score));
+                const potWinners=pot.eligiblePlayers.filter(p=>playerScores.get(p).score===maxScore);
+                const share=Math.floor(amount/potWinners.length);let remainder=amount%potWinners.length;
+                potWinners.sort((a,b)=>((this.playersOrder.indexOf(a.userId)-this.dealerPos-1+this.playersOrder.length)%this.playersOrder.length)-((this.playersOrder.indexOf(b.userId)-this.dealerPos-1+this.playersOrder.length)%this.playersOrder.length));
+                potWinners.forEach(w=>{const award=share+(remainder-->0?1:0);winnings.set(w,(winnings.get(w)||0)+award);boardWinnings.set(w,(boardWinnings.get(w)||0)+award);if(!winnersList.includes(w))winnersList.push(w);});
             }
-            const potWinners = pot.eligiblePlayers.filter(p => playerScores.get(p).score === maxScore);
-            const share = Math.floor(pot.amount / potWinners.length);
-            let remainder = pot.amount % potWinners.length;
-            potWinners.sort((a,b) => ((this.playersOrder.indexOf(a.userId)-this.dealerPos-1+this.playersOrder.length)%this.playersOrder.length)-((this.playersOrder.indexOf(b.userId)-this.dealerPos-1+this.playersOrder.length)%this.playersOrder.length));
-            potWinners.forEach(w => {
-                winnings.set(w, (winnings.get(w) || 0) + share + (remainder-- > 0 ? 1 : 0));
-                if (!winnersList.includes(w)) winnersList.push(w);
-            });
-        }
-
-        this.winners = winnersList.map(w => w.userId);
-        const winnerMessages = [];
-        for (const [w, amount] of winnings.entries()) {
-            w.chips += amount;
-            const desc = playerScores.get(w).desc;
-            winnerMessages.push(`${w.name} (${desc}) 贏得 ${amount}`);
-        }
-        this.messages.push(`結算: ${winnerMessages.join(', ')}`);
+            boardMessages.push(`${boards.length===2?`第 ${boardIndex+1} 次：`:''}${[...boardWinnings].map(([w,amount])=>`${w.name} (${playerScores.get(w).desc}) 贏得 ${amount}`).join(', ')}`);
+        });
+        this.winners=winnersList.map(w=>w.userId);
+        for(const [winner,amount] of winnings)winner.chips+=amount;
+        this.messages.push(`結算: ${boardMessages.join('；')}`);
 
         this.gameState = 'showdown';
         history.finish(this);
@@ -1037,10 +1130,20 @@ class TexasHoldemGame {
             turn_deadline: this.turnDeadline,
             server_time: serverTime,
             turn_remaining_ms: Math.max(0, this.turnDeadline - serverTime),
-            turn_id: this.scheduledAction?.kind === 'turn' ? this.turnSequence : null,
+            turn_id: ['turn','runout_choice'].includes(this.scheduledAction?.kind) ? this.turnSequence : null,
             min_raise: this.currentBetAmount + this.lastRaiseAmount,
             community_cards: this.communityCards.map(c => c.toString()),
-            current_player_id: ['pre_flop','flop','turn','river'].includes(this.gameState) && this.scheduledAction?.kind !== 'runout' && this.getCurrentPlayer()?.canBet() ? this.getCurrentPlayer().userId : null,
+            runout_boards: this.runoutBoards?.length===2?this.runoutBoards.map(board=>board.map(String)):null,
+            runout_choice: this.runoutDecision ? {
+                stage:this.runoutDecision.stage,
+                proposed_runs:this.runoutDecision.proposedRuns,
+                proposer_id:this.runoutDecision.proposerId,
+                proposer_name:this.players[this.runoutDecision.proposerId]?.name,
+                decider_id:this.runoutDecision.deciderId,
+                decider_name:this.players[this.runoutDecision.deciderId]?.name,
+                actor_id:this.runoutDecision.stage==='proposal'?this.runoutDecision.proposerId:this.runoutDecision.deciderId
+            }:null,
+            current_player_id: ['pre_flop','flop','turn','river'].includes(this.gameState) && !['runout','runout_choice'].includes(this.scheduledAction?.kind) && this.getCurrentPlayer()?.canBet() ? this.getCurrentPlayer().userId : null,
             winners: this.winners,
             action_count: this.actionCount || 0,
             latest_voice: this.latestVoice || '',
@@ -1062,8 +1165,11 @@ class TexasHoldemGame {
                     folded: p.folded,
                     left_table: !!p.leftTable,
                     all_in: p.allIn,
+                    hands_played: p.handsPlayed || 0,
+                    time_cards: p.timeCards || 0,
+                    time_card_used_this_turn: p.timeCardTurnId===this.turnSequence,
                     last_action: p.lastAction,
-                    is_current_player: p.userId === (this.getCurrentPlayer() ? this.getCurrentPlayer().userId : null),
+                    is_current_player: !this.runoutDecision && p.userId === (this.getCurrentPlayer() ? this.getCurrentPlayer().userId : null),
                     shown_card_indexes: p.shownCardIndexes || [],
                     can_show_cards: p.userId === userId && this.canShowCards(p),
                     hand: p.hand.map((c, index) => showCards || (p.shownCardIndexes || []).includes(index) ? c.toString() : '??')
@@ -1150,6 +1256,24 @@ app.post('/show_cards', (req, res) => {
     const [success, message] = game.showCards(user_id, hand_number, card_indexes);
     res.status(success ? 200 : 409).json({success, message, game_state:game.toJSON(user_id)});
     if (success) broadcastState(game_id);
+});
+
+app.post('/use_time_card', (req,res) => {
+    const {game_id,user_id}=req.body,game=GAMES[game_id];
+    if(!game)return res.status(404).json({success:false,message:'找不到遊戲'});
+    if(req.body.expected_action_count!==undefined&&req.body.expected_action_count!==game.actionCount)return res.status(409).json({success:false,message:'牌局已更新',game_state:game.toJSON(user_id)});
+    const [success,message]=game.useTimeCard(user_id);
+    res.status(success?200:409).json({success,message,game_state:game.toJSON(user_id)});
+    if(success)broadcastState(game_id);
+});
+
+app.post('/runout_choice', (req,res) => {
+    const {game_id,user_id,runs}=req.body,game=GAMES[game_id];
+    if(!game)return res.status(404).json({success:false,message:'找不到遊戲'});
+    if(req.body.expected_action_count!==undefined&&req.body.expected_action_count!==game.actionCount)return res.status(409).json({success:false,message:'牌局已更新',game_state:game.toJSON(user_id)});
+    const [success,message]=game.chooseRunout(user_id,runs);
+    res.status(success?200:409).json({success,message,game_state:game.toJSON(user_id)});
+    if(success)broadcastState(game_id);
 });
 
 app.post('/rebuy', (req, res) => {

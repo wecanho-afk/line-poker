@@ -10,11 +10,13 @@
   const stage = document.createElement('section'); stage.className = 'table-stage'; stage.setAttribute('aria-label','牌桌');
   const rail = document.createElement('aside'); rail.className = 'action-rail'; rail.setAttribute('aria-label','牌局操作');
   const state = document.createElement('div'); state.id = 'action-status'; state.setAttribute('role','status');
+  const timeCard=document.createElement('button');timeCard.id='time-card-btn';timeCard.type='button';timeCard.className='btn-blue';timeCard.hidden=true;
+  const runoutChoice=document.createElement('section');runoutChoice.id='runout-choice-panel';runoutChoice.hidden=true;runoutChoice.setAttribute('aria-live','polite');
   const board = document.createElement('div'); board.className = 'board-center';
   board.append(document.querySelector('.pot-area'),byId('community-cards'));
   byId('poker-table').prepend(board);
   stage.append(room,byId('table-meta'),byId('poker-table'));
-  rail.append(state,byId('turn-timer-display'),byId('tournament-info-display'),byId('practice-context'),byId('game-controls'),byId('repeat-practice'),tools,byId('lobby-return'));
+  rail.append(state,byId('turn-timer-display'),timeCard,runoutChoice,byId('tournament-info-display'),byId('practice-context'),byId('game-controls'),byId('repeat-practice'),tools,byId('lobby-return'));
   game.append(stage,rail);
   byId('game-controls').children[0].className='primary-actions';
   byId('game-controls').children[1].className='quick-actions';
@@ -35,6 +37,39 @@
   reveal.innerHTML='<strong>本手結束 · 秀牌</strong><p>選一張或兩張公開給全桌，公開後無法收回。</p><div class="show-card-actions"></div><p id="show-cards-status" role="status"></p>';
   byId('game-controls').after(reveal);
   let revealBusy=false;
+  let featureBusy=false;
+  timeCard.onclick=async()=>{
+    if(featureBusy)return;featureBusy=true;timeCard.disabled=true;
+    try{const result=await api('/use_time_card','POST',{game_id:gameId,user_id:userId,expected_action_count:proState?.action_count});if(result.game_state)updateUI(result.game_state);if(!result.success)alert(result.message||'時間卡使用失敗');}
+    catch{alert('連線中斷，請確認時間卡狀態後重試');}finally{featureBusy=false;if(proState)renderTableFeatures(proState);}
+  };
+  async function chooseRunout(runs){
+    if(featureBusy)return;featureBusy=true;runoutChoice.querySelectorAll('button').forEach(b=>b.disabled=true);
+    try{const result=await api('/runout_choice','POST',{game_id:gameId,user_id:userId,runs,expected_action_count:proState?.action_count});if(result.game_state)updateUI(result.game_state);if(!result.success)alert(result.message||'選擇未送出');}
+    catch{alert('連線中斷，請重新確認發牌次數');}finally{featureBusy=false;if(proState)renderTableFeatures(proState);}
+  }
+  function renderRunoutBoards(state){
+    const area=byId('community-cards'),boards=state.runout_boards;
+    area.classList.toggle('run-twice',Array.isArray(boards)&&boards.length===2);
+    if(!Array.isArray(boards)||boards.length!==2)return;
+    area.innerHTML=boards.map((cards,index)=>`<div class="runout-lane"><b>${index+1}</b>${[0,1,2,3,4].map(i=>cards[i]?formatCard(cards[i]):'<div class="card-empty"></div>').join('')}</div>`).join('');
+    area.setAttribute('aria-label','公共牌發兩次');
+  }
+  function renderTableFeatures(state){
+    const me=state.players.find(p=>p.user_id===userId),cards=me?.time_cards||0,remaining=50-((me?.hands_played||0)%50);
+    timeCard.hidden=!gameId;timeCard.textContent=cards?`⏱ 30秒時間卡 ×${cards}`:`⏱ 再 ${remaining} 手獲得時間卡`;
+    timeCard.disabled=featureBusy||cards<1||state.current_player_id!==userId||me?.time_card_used_this_turn;
+    timeCard.title=me?.time_card_used_this_turn?'本回合已使用時間卡':cards?'輪到你時可增加 30 秒':`再完成 ${remaining} 手獲得 1 張`;
+    const choice=state.runout_choice;runoutChoice.hidden=!choice;
+    if(choice){
+      const mine=choice.actor_id===userId,proposal=choice.proposed_runs;
+      const title=choice.stage==='proposal'?`${choice.proposer_name} 目前落後，提議發牌次數`:`${choice.decider_name} 目前領先，做最後決定`;
+      const detail=choice.stage==='proposal'?(mine?'你可以提議剩餘公共牌發一次或兩次。':`等待 ${choice.proposer_name} 提議發牌次數…`):(mine?`${choice.proposer_name} 提議發 ${proposal} 次；你決定最後發牌次數。`:`${choice.proposer_name} 提議發 ${proposal} 次，等待 ${choice.decider_name} 最後決定…`);
+      runoutChoice.innerHTML=`<strong>${escapeHTML(title)}</strong><p>${escapeHTML(detail)}</p>${mine?'<div><button type="button" data-runs="1">發 1 次</button><button type="button" data-runs="2">發 2 次</button></div>':''}`;
+      runoutChoice.querySelectorAll('[data-runs]').forEach(button=>button.onclick=()=>chooseRunout(Number(button.dataset.runs)));
+    }
+    renderRunoutBoards(state);
+  }
   async function showSelectedCards(indexes, handNumber) {
     if(revealBusy)return;
     revealBusy=true;
@@ -72,9 +107,10 @@
   proUpdate=function(state){
     originalUpdate(state);
     renderReveal(state);
+    renderTableFeatures(state);
     const active=['pre_flop','flop','turn','river'].includes(state.game_state);
     const mine=state.current_player_id===userId && active;
-    byId('action-status').textContent=mine?'輪到你了':active?'等待對手行動':streetLabels[state.game_state]||'準備入座';
+    byId('action-status').textContent=state.runout_choice?(state.runout_choice.actor_id===userId?'請選擇發牌次數':'等待發牌次數決定'):mine?'輪到你了':active?'等待對手行動':streetLabels[state.game_state]||'準備入座';
     rail.classList.toggle('your-turn',mine);
   };
 })();

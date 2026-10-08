@@ -509,7 +509,8 @@
             if (!timerEl) return;
             const render = () => {
                 const remaining = turnClock.remaining();
-                const label = state.current_player_id === userId ? '你的思考時間' : '對手思考時間';
+                const thinkingId = state.runout_choice?.actor_id || state.current_player_id;
+                const label = thinkingId === userId ? '你的思考時間' : '對手思考時間';
                 timerEl.textContent = remaining > 0 ? `⏳ ${label}: ${(remaining/1000).toFixed(1)}s` : '⏳ 時間已到，等待伺服器更新…';
                 if (remaining === 0) {
                     clearInterval(timerInterval);
