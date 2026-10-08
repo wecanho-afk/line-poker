@@ -91,7 +91,7 @@ class Player {
         this.invested = 0; // Total invested in this hand
         this.avatar = '';
         this.handsPlayed = 0;
-        this.timeCards = 0;
+        this.timeCards = 2;
         this.timeCardTurnId = null;
     }
     resetForNewRound() {

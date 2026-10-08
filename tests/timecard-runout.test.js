@@ -6,10 +6,10 @@ const games=[];
 const cards=text=>text.split(' ').map(c=>new Card(c[0],c[1]));
 function headsUp(){const g=new TexasHoldemGame('feature-'+games.length,'a','A',1000);games.push(g);g.addPlayer('b','B');return g;}
 
-test('every fiftieth dealt hand awards one 30-second card and it extends only the current turn once',()=>{
- const g=headsUp();g.players.a.handsPlayed=49;assert.equal(g.startGame()[0],true);
+test('players enter with two time cards; every fiftieth dealt hand awards another and it extends only the current turn once',()=>{
+ const g=headsUp();assert.equal(g.players.a.timeCards,2);assert.equal(g.players.b.timeCards,2);g.players.a.handsPlayed=49;assert.equal(g.startGame()[0],true);assert.equal(g.players.a.timeCards,3);
  const player=g.getCurrentPlayer();
- if(player.userId!=='a'){g.players[player.userId].timeCards=1;}else assert.equal(player.timeCards,1);
+ if(player.userId==='a')assert.equal(player.timeCards,3);else assert.equal(player.timeCards,2);
  const before=g.turnDeadline,sequence=g.turnSequence,cardsBefore=player.timeCards;
  assert.equal(g.useTimeCard(player.userId)[0],true);
  assert.equal(g.turnDeadline,before+30000);assert.equal(player.timeCards,cardsBefore-1);assert.equal(player.timeCardTurnId,sequence+1);
