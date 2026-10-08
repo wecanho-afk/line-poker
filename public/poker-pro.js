@@ -91,7 +91,7 @@ function showProView(view) {
     document.getElementById('pro-panel').hidden=view==='table';
     if(view==='table') { if(proState) updateUI(proState); return; }
     document.getElementById('game-controls').style.display='none';
-    if(view==='history') loadHistory(); else loadScenes();
+    if(view==='history') loadHistory(); else if(view==='style') loadPlayerStyle(); else loadScenes();
 }
 async function loadScenes() {
     const panel=document.getElementById('pro-panel'); panel.innerHTML='<p role="status">載入練習場景…</p>';
@@ -160,6 +160,46 @@ function renderStep() {
     if(!e){detail.innerHTML+='<p>這手牌没有可回顧的主動決策。</p>';return;}
     detail.innerHTML+=`<div class="review-actions"><button id="review-prev" ${selectedStep===0?'disabled':''} aria-label="上一步">←</button><span>${selectedStep+1} / ${h.actions.length} · ${streetLabels[e.street]}</span><button id="review-next" ${selectedStep===h.actions.length-1?'disabled':''} aria-label="下一步">→</button></div><div class="review-cards">${e.board.map(c=>formatCard(c)).join('')||'<span class="muted">尚未發出公共牌</span>'}</div><div class="review-step"><strong>${escapeHTML(e.name)} ${actionLabels[e.display_action || e.action]} ${e.action==='raise'||e.action==='call'?e.amount:''}</strong><br><span class="muted">行動前底池 ${e.pot} · 剩餘 ${e.stack} · 跟注額 ${e.call} · ${escapeHTML(e.position)}</span>${e.advice?`<div class="advice"><strong>${e.action===e.advice.action?'方向符合建議':'可檢討的決策'}：${actionLabels[e.advice.action === 'raise' && e.display_action === 'bet' ? 'bet' : e.advice.action]} ${e.advice.amount||''}</strong><p>${escapeHTML(e.advice.reason)}</p><p class="muted">${escapeHTML(e.advice.caveat)}</p>${e.action==='raise'&&e.advice.action==='raise'?'<p>同為加注仍需比較尺寸；上述金額為模型建議總額。</p>':''}</div>`:'<p class="muted">對手行動紀錄；不使用對手底牌提供分析。</p>'}</div>`;
     document.getElementById('review-prev').onclick=()=>{selectedStep--;renderStep();};document.getElementById('review-next').onclick=()=>{selectedStep++;renderStep();};
+}
+function radarMarkup(metrics) {
+    const cx=180,cy=170,radius=112,count=metrics.length;
+    const point=(index,scale)=>{const angle=-Math.PI/2+index*Math.PI*2/count;return `${(cx+Math.cos(angle)*radius*scale).toFixed(1)},${(cy+Math.sin(angle)*radius*scale).toFixed(1)}`;};
+    const grids=[.25,.5,.75,1].map(scale=>`<polygon points="${metrics.map((_,i)=>point(i,scale)).join(' ')}"></polygon>`).join('');
+    const axes=metrics.map((_,i)=>{const [x,y]=point(i,1).split(',');return `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}"></line>`;}).join('');
+    const data=metrics.map((metric,i)=>point(i,Math.max(0,Math.min(100,metric.value))/100)).join(' ');
+    const labels=metrics.map((metric,i)=>{const [x,y]=point(i,1.3).split(',');return `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle"><tspan x="${x}">${escapeHTML(metric.short)}</tspan><tspan x="${x}" dy="15">${metric.sample?metric.value+'%':'—'}</tspan></text>`;}).join('');
+    return `<svg class="style-radar" viewBox="0 0 360 340" role="img" aria-label="牌手風格雷達圖"><title>最近手牌的六項風格指標</title><g class="radar-grid">${grids}${axes}</g><polygon class="radar-value" points="${data}"></polygon><g class="radar-points">${metrics.map((metric,i)=>{const [x,y]=point(i,metric.value/100).split(',');return `<circle cx="${x}" cy="${y}" r="4"></circle>`;}).join('')}</g><g class="radar-labels">${labels}</g></svg>`;
+}
+function renderPlayerStyle(hands,notice) {
+    const panel=document.getElementById('pro-panel'),report=PokerPlayerStyle.analyze(hands);
+    panel.innerHTML=`<div class="panel-top"><div><h2>牌手風格</h2><div class="muted">依最近 ${report.hands} / 100 手分析 · 僅使用你的行動與結果</div></div><button id="reload-style">重新整理</button></div><p class="muted" role="status">${escapeHTML(notice)}</p>`;
+    document.getElementById('reload-style').onclick=loadPlayerStyle;
+    if(!report.hands){panel.innerHTML+='<div class="empty-state">還沒有足夠的牌局資料。<br>完成一般牌局或場景練習後，這裡會開始建立你的風格雷達圖。</div>';return;}
+    const signed=report.totalNet>=0?'+'+report.totalNet:String(report.totalNet),avg=report.averageNet>=0?'+'+report.averageNet:String(report.averageNet);
+    panel.innerHTML+=`<section class="style-hero"><div class="style-profile"><span class="style-kicker">近期主要風格</span><h3>${escapeHTML(report.archetype)}</h3><p>${escapeHTML(report.summary)}</p><div class="confidence"><span>分析可信度</span><strong>${report.confidence}%</strong><i><b style="width:${report.confidence}%"></b></i><small>累積 30 手後較穩定</small></div></div><div class="radar-wrap">${radarMarkup(report.metrics)}</div></section>`;
+    panel.innerHTML+=`<div class="style-summary"><div><span>分析手數</span><strong>${report.hands}</strong></div><div><span>總盈虧</span><strong class="${report.totalNet>=0?'positive':'negative'}">${signed}</strong></div><div><span>每手平均</span><strong class="${report.averageNet>=0?'positive':'negative'}">${avg}</strong></div><div><span>獲利手牌</span><strong>${report.wins}</strong></div></div>`;
+    panel.innerHTML+=`<section class="metric-grid" aria-label="牌手風格指標">${report.metrics.map(metric=>`<article><div><span>${escapeHTML(metric.short)}</span><strong>${metric.sample?metric.value+'%':'—'}</strong></div><h3>${escapeHTML(metric.label)}</h3><p>${escapeHTML(metric.help)}</p><small>${metric.sample?`樣本 ${metric.sample}`:'尚無可分析行動'}</small></article>`).join('')}</section>`;
+    panel.innerHTML+=`<section class="style-insights"><h3>近期觀察</h3>${report.notes.map(note=>`<p>${escapeHTML(note)}</p>`).join('')}<small>風格分析描述近期行動模式，不代表固定打法，也不是勝率保證。</small></section>`;
+}
+async function loadPlayerStyle() {
+    const panel=document.getElementById('pro-panel');panel.innerHTML='<p role="status">分析近期牌局…</p>';
+    const version=++historyLoadVersion,owner=cacheOwner();let local=[],cacheFailed=false;
+    try { local=await HandCache.read(owner); } catch { cacheFailed=true; }
+    if(proView!=='style'||version!==historyLoadVersion)return;
+    const pending=proState?.completed_hand?[proState.completed_hand]:[],current=mergeReviews(local,pending);
+    let notice=cacheFailed?'瀏覽器儲存空間無法使用；目前只能分析本次尚未離開的牌局。':'分析保存在此瀏覽器的近期手牌。';
+    renderPlayerStyle(current,notice);
+    try {
+        const response=await fetch(`${BACKEND_URL}/hand_history/${encodeURIComponent(userId)}`,{headers:{'X-History-Key':historyKey},cache:'no-store',signal:AbortSignal.timeout(8000)}),res=await response.json();
+        if(!response.ok||!res.success)throw Error('無法讀取');
+        const merged=mergeReviews(local,pending,res.hands);
+        try { await HandCache.save(owner,merged); } catch { notice='已取得近期資料，但瀏覽器無法保存。'; }
+        if(proView!=='style'||version!==historyLoadVersion)return;
+        renderPlayerStyle(merged,notice);
+    } catch {
+        if(proView!=='style'||version!==historyLoadVersion)return;
+        renderPlayerStyle(current,current.length?'伺服器暫時無法連線，使用此瀏覽器保存的資料分析。':'目前無法連線，且此瀏覽器沒有已保存的手牌。');
+    }
 }
 document.querySelectorAll('[data-pro-view]').forEach(b=>b.onclick=()=>showProView(b.dataset.proView));
 document.getElementById('repeat-practice').onclick=()=>startPractice(proState.practice.id);
