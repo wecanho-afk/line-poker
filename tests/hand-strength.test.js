@@ -1,4 +1,8 @@
-const {test}=require('node:test');const assert=require('node:assert/strict');const {describe}=require('../public/hand-strength');
+const {test}=require('node:test');const assert=require('node:assert/strict');const {describe,isPremiumStartingHand}=require('../public/hand-strength');
+test('premium starting hands include JJ+ AK and suited AQ only',()=>{
+ for(const hand of [['Js','Jh'],['Qs','Qd'],['Kh','Kc'],['As','Ad'],['As','Kh'],['Ah','Kd'],['As','Qs']])assert.equal(isPremiumStartingHand(hand),true,hand.join(' '));
+ for(const hand of [['Ts','Th'],['As','Qh'],['Ks','Qs'],['9s','9h'],['??','??'],['As','As']])assert.equal(isPremiumStartingHand(hand),false,hand.join(' '));
+});
 test('personal strength identifies ranks, wheel, pairs, full houses and best five of seven',()=>{
  const cases=[
  [['As','2h'],['3c','4d','5s'],'A～5 順子'],

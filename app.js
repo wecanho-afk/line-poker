@@ -243,6 +243,7 @@ class TexasHoldemGame {
         this.winners = [];
         this.handSettled = false;
         this.actionCount = 0;
+        this.handNumber = 0;
         this.latestVoice = '';
         this.runoutDecision = null;
         this.runoutBoards = null;
@@ -402,6 +403,8 @@ class TexasHoldemGame {
             this.messages.push("玩家不足，遊戲結束。");
             return;
         }
+
+        this.handNumber += 1;
 
         // Advance Dealer
         this.dealerPos = (this.dealerPos + 1) % this.playersOrder.length;
