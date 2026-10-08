@@ -212,3 +212,13 @@ body.allin-hand .action-rail { border-color:#976c46; }
 .premium-edge-flash .card { border-color:#ffd870;box-shadow:0 0 var(--premium-glow) rgba(255,201,72,var(--premium-alpha)),inset 0 0 var(--premium-glow) rgba(255,230,153,var(--premium-alpha)); }
 @keyframes premium-edge-pass { 0% { --premium-glow:0px;--premium-alpha:0;filter:brightness(1); } 35% { --premium-glow:10px;--premium-alpha:1;filter:brightness(1.2); } 70% { --premium-glow:5px;--premium-alpha:.65;filter:brightness(1.08); } 100% { --premium-glow:0px;--premium-alpha:0;filter:brightness(1); } }
 @media(prefers-reduced-motion:reduce) { .premium-edge-flash { animation-duration:.01ms; } }
+.settlement-card { width:min(680px,92vw);max-width:680px;padding:20px; }
+#settlementList { text-align:left;max-height:55vh;overflow:auto;margin:15px 0;font-size:.95rem; }
+.settlement-head,.settlement-row { display:grid;grid-template-columns:minmax(105px,1.4fr) repeat(3,minmax(76px,1fr));gap:8px;align-items:center;padding:9px 7px; }
+.settlement-head { color:#c9b483;font-size:.78rem;border-bottom:1px solid #806f49; }
+.settlement-row { border-bottom:1px solid rgba(255,255,255,.1); }
+.settlement-row span:not(:first-child),.settlement-head span:not(:first-child) { text-align:right; }
+.settlement-row .profit { color:#73dfa1;font-weight:800; }.settlement-row .loss { color:#ff8585;font-weight:800; }.settlement-row .even { color:#d3d6d4;font-weight:800; }
+@media(max-width:560px) { .settlement-card { padding:14px 10px; }.settlement-head,.settlement-row { grid-template-columns:minmax(82px,1.2fr) repeat(3,minmax(60px,1fr));gap:4px;padding:8px 3px;font-size:.76rem; }.settlement-head { font-size:.67rem; } }
+.cash-hand-limit { display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid #777;border-radius:5px;background:#333;color:#ddd;font-size:.78rem; }
+.cash-hand-limit input { width:62px;min-width:62px;padding:5px;text-align:center; }

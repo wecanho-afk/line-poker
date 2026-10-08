@@ -253,13 +253,14 @@
             </div>
             <p style="margin-top: 0;">請選擇建立或加入遊戲</p>
             <div style="display: flex; flex-direction: column; gap: 10px;">
-                <div style="display: flex; gap: 5px; justify-content: center;">
+                <div style="display: flex; gap: 7px; justify-content: center; flex-wrap: wrap;">
                     <select id="gameModeInput" style="padding: 10px; border-radius: 5px; border: 1px solid #777; background: #333; color: white;">
-                        <option value="cash">常規賽</option>
+                        <option value="cash">現金局</option>
                         <option value="tournament">錦標賽</option>
                     </select>
 <input type="number" id="initialChipsInput" placeholder="初始籌碼" value="1000">
                     <input type="number" id="smallBlindInput" placeholder="初始小盲注 (預設10)" value="10">
+                    <label id="cashHandLimitField" class="cash-hand-limit"><span>現金局手數</span><input type="number" id="cashHandLimitInput" aria-label="現金局總手數" value="50" min="1" max="1000" step="1"></label>
                     <input type="number" id="blindDurationInput" placeholder="升盲時間(秒, 預設600)" value="600" style="display: none;" id="durationWrapper">
                     <input type="number" id="maxReEntryInput" placeholder="重買次數 (預設2, 0為凍結賽)" value="2" style="display: none;">
                     <button class="btn-blue" onclick="createGame()">建立新遊戲房</button>
@@ -353,9 +354,9 @@
         </dialog>
 
         <div id="settlementModal" class="modal">
-            <div class="modal-content" style="max-width: 300px;">
-                <h2 style="color: gold; margin-top: 0;">🏆 錦標賽結算 🏆</h2>
-                <div id="settlementList" style="text-align: left; max-height: 250px; overflow-y: auto; margin: 15px 0; font-size: 1.1em; line-height: 1.5;"></div>
+            <div class="modal-content settlement-card">
+                <h2 id="settlementTitle" style="color: gold; margin-top: 0;">🏆 結算 🏆</h2>
+                <div id="settlementList"></div>
                 <button class="btn-blue" onclick="document.getElementById('settlementModal').style.display='none'">關閉</button>
             </div>
         </div>
@@ -687,6 +688,8 @@
             if(dur) dur.style.display = e.target.value === 'tournament' ? 'inline-block' : 'none';
             const reEntry = document.getElementById('maxReEntryInput');
             if(reEntry) reEntry.style.display = e.target.value === 'tournament' ? 'inline-block' : 'none';
+            const handLimit = document.getElementById('cashHandLimitField');
+            if(handLimit) handLimit.style.display = e.target.value === 'cash' ? 'inline-block' : 'none';
         });
 
         async function createGame() {
@@ -696,15 +699,17 @@
             
             const initialChips = document.getElementById('initialChipsInput').value;
             const gameMode = document.getElementById('gameModeInput') ? document.getElementById('gameModeInput').value : 'cash';
-            
-            const res = await api('/create_game', 'POST', { user_id: userId, user_name: customName, initial_chips: initialChips, avatar: userAvatar, game_mode: gameMode, small_blind: document.getElementById('smallBlindInput')?.value, blind_duration: document.getElementById('blindDurationInput')?.value, max_re_entry: document.getElementById('maxReEntryInput')?.value });
+            const cashHandLimit = Number(document.getElementById('cashHandLimitInput')?.value);
+            if (gameMode === 'cash' && (!Number.isSafeInteger(cashHandLimit) || cashHandLimit < 1 || cashHandLimit > 1000)) return alert('現金局總手數請輸入 1～1000 的整數');
+
+            const res = await api('/create_game', 'POST', { user_id: userId, user_name: customName, initial_chips: initialChips, avatar: userAvatar, game_mode: gameMode, cash_hand_limit: cashHandLimit, small_blind: document.getElementById('smallBlindInput')?.value, blind_duration: document.getElementById('blindDurationInput')?.value, max_re_entry: document.getElementById('maxReEntryInput')?.value });
             if (res.success) {
                 gameId = res.game_id;
                 isHost = true;
                 if(socket) socket.emit('join_room', { game_id: gameId, user_id: userId, history_key: historyKey });
                 showGame();
                 updateUI(res.game_state);
-            }
+            } else alert(res.message || '建立房間失敗');
         }
 
         async function joinGame() {
@@ -1015,11 +1020,11 @@
             const isBusted = me && me.chips === 0 && (me.folded || !['pre_flop', 'flop', 'turn', 'river'].includes(state.game_state) || state.game_state === 'showdown');
             const betweenHands = !['pre_flop', 'flop', 'turn', 'river'].includes(state.game_state);
             const rebuyButton = document.getElementById('rebuy-btn');
-            rebuyButton.style.display = me && betweenHands && !state.practice && (state.game_mode === 'cash' || isBusted) ? 'block' : 'none';
+            rebuyButton.style.display = me && betweenHands && !state.practice && !state.cash_settlement && (state.game_mode === 'cash' || isBusted) ? 'block' : 'none';
             rebuyButton.textContent = state.game_mode === 'tournament' ? '💰 Re-entry' : '💰 重新買入／補碼';
 
             // 房主按鈕
-            const isWaiting = state.game_state === 'waiting_for_players' || state.game_state === 'game_over';
+            const isWaiting = (state.game_state === 'waiting_for_players' || state.game_state === 'game_over') && !state.cash_settlement;
             document.getElementById('start-btn').style.display = (isHost && isWaiting && state.players.filter(p => p.chips > 0).length >= 2) ? 'block' : 'none';
             document.getElementById('add-bot-btn').style.display = (isHost && isWaiting && state.players.length < 8) ? 'block' : 'none';
             
@@ -1034,7 +1039,13 @@
                 document.getElementById('turn-timer-display').textContent = '';
             }
 
-            if (state.game_state === 'game_over' && state.tournament_info && state.tournament_info.playersStats) {
+            if (state.game_state === 'game_over' && state.cash_settlement) {
+                const money=n=>`${n>0?'+':''}${n.toLocaleString('zh-TW')}`;
+                document.getElementById('settlementTitle').textContent=`🏆 現金局 ${state.hand_limit} 手結算`;
+                document.getElementById('settlementList').innerHTML='<div class="settlement-head"><span>玩家</span><span>總帶入</span><span>結算籌碼</span><span>水上／水下</span></div>'+state.cash_settlement.map((p,index)=>`<div class="settlement-row"><span><b>${index+1}. ${escapeHTML(p.name)}</b></span><span>${p.total_buy_in.toLocaleString('zh-TW')}</span><span>${p.final_chips.toLocaleString('zh-TW')}</span><span class="${p.net>0?'profit':p.net<0?'loss':'even'}">${p.status} ${money(p.net)}</span></div>`).join('');
+                const modal=document.getElementById('settlementModal'),key=`${state.game_id}:${state.hand_number}:cash`;
+                if(modal.dataset.settlementKey!==key){modal.dataset.settlementKey=key;modal.style.display='flex';}
+            } else if (state.game_state === 'game_over' && state.tournament_info && state.tournament_info.playersStats) {
                 const stats = state.tournament_info.playersStats;
                 const sortedPlayers = Object.values(stats).sort((a, b) => a.rank - b.rank);
                 let html = '';
@@ -1045,14 +1056,14 @@
                 });
                 const modal = document.getElementById('settlementModal');
                 if (modal) {
+                    document.getElementById('settlementTitle').textContent='🏆 錦標賽結算 🏆';
                     document.getElementById('settlementList').innerHTML = html;
-                    if (modal.style.display !== 'flex') {
-                        modal.style.display = 'flex';
-                    }
+                    const key=`${state.game_id}:${state.hand_number}:tournament`;
+                    if(modal.dataset.settlementKey!==key){modal.dataset.settlementKey=key;modal.style.display='flex';}
                 }
             } else {
                 const modal = document.getElementById('settlementModal');
-                if (modal) modal.style.display = 'none';
+                if (modal) {modal.style.display = 'none';delete modal.dataset.settlementKey;}
             }
 
             proUpdate(state);

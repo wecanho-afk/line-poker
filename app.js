@@ -79,6 +79,7 @@ class Player {
         this.userId = userId;
         this.name = name;
         this.chips = chips;
+        this.totalBuyIn = chips;
         this.hand = [];
         this.shownCardIndexes = [];
         this.currentBet = 0;
@@ -206,9 +207,10 @@ class TournamentManager {
 }
 
 class TexasHoldemGame {
-    constructor(gameId, hostUserId, hostName, initialChips = 1000, gameMode = "cash", smallBlind = 10, blindDuration = 600, maxReEntry = 2) {
+    constructor(gameId, hostUserId, hostName, initialChips = 1000, gameMode = "cash", smallBlind = 10, blindDuration = 600, maxReEntry = 2, cashHandLimit = null) {
         this.gameId = gameId;
         this.gameMode = gameMode;
+        this.cashHandLimit = gameMode === 'cash' && Number.isSafeInteger(cashHandLimit) && cashHandLimit > 0 ? cashHandLimit : null;
         
         const sbMults = [1, 1.5, 2, 3, 4, 6, 8, 10, 15, 20, 30, 40, 60, 80, 120, 160, 200, 300, 400, 600];
         const anteMults = [0, 0, 0.5, 0.5, 1, 1.5, 2, 2, 3, 4, 6, 8, 10, 15, 20, 30, 40, 60, 80, 100];
@@ -357,6 +359,7 @@ class TexasHoldemGame {
 
     startGame() {
         if (this.gameState !== 'waiting_for_players' && !(this.gameMode === 'cash' && this.gameState === 'game_over')) return [false, "無法開始"];
+        if (this.cashHandLimit && this.handNumber >= this.cashHandLimit) return [false, "本房間已完成指定手數"];
         if (this.playersOrder.length < 2) return [false, "人數不足"];
 
         this.messages.push("遊戲開始！");
@@ -366,6 +369,7 @@ class TexasHoldemGame {
 
     startNewRound() {
         if (!['waiting_for_players', 'waiting_for_next_round', 'game_over'].includes(this.gameState)) return;
+        if (this.cashHandLimit && this.handNumber >= this.cashHandLimit) { this.gameState = 'game_over'; return; }
         this.cancelScheduledAction();
         this.deck = new Deck();
         this.communityCards = [];
@@ -1037,6 +1041,11 @@ class TexasHoldemGame {
     }
 
     prepareNext() {
+        if (this.cashHandLimit && this.handNumber >= this.cashHandLimit) {
+            this.gameState = 'game_over';
+            this.messages.push(`已完成 ${this.cashHandLimit} 手，現金局結算完成。`);
+            return;
+        }
         const busted = Object.keys(this.players).filter(id => this.players[id].chips === 0 && !this.players[id].sittingOut);
         busted.forEach(id => {
             if (this.tournamentManager) {
@@ -1058,6 +1067,7 @@ class TexasHoldemGame {
             } else {
                 if (this.players[id].isBot) {
                     this.players[id].chips = this.initialChips;
+                    this.players[id].totalBuyIn += this.initialChips;
                     this.messages.push(`${this.players[id].name} 已自動買入 ${this.initialChips}`);
                 } else {
                     this.players[id].sittingOut = true;
@@ -1106,6 +1116,11 @@ class TexasHoldemGame {
     toJSON(userId) {
         this.snapshotVersion = (this.snapshotVersion || 0) + 1;
         const serverTime = Date.now();
+        const cashComplete = this.gameMode === 'cash' && this.cashHandLimit && this.handNumber >= this.cashHandLimit && this.gameState === 'game_over';
+        const cashSettlement = cashComplete ? this.playersOrder.map(id => {
+            const p=this.players[id],buyIn=p.totalBuyIn || 0,net=p.chips-buyIn;
+            return {user_id:id,name:p.name,avatar:p.avatar,total_buy_in:buyIn,final_chips:p.chips,net,status:net>0?'水上':net<0?'水下':'平手'};
+        }).sort((a,b)=>b.net-a.net||b.final_chips-a.final_chips) : null;
         return {
             snapshot_version: this.snapshotVersion,
             viewer_id: userId,
@@ -1117,6 +1132,8 @@ class TexasHoldemGame {
             practice: this.practice ? { id: this.practice.id, title: this.practice.title, prompt: this.practice.prompt, lesson: this.currentHand?.finished ? this.practice.lesson : null } : null,
             game_id: this.gameId,
             game_mode: this.gameMode,
+            hand_limit: this.cashHandLimit,
+            cash_settlement: cashSettlement,
             rebuy_default: this.initialChips,
             game_state: this.gameState,
             tournament_info: this.tournamentManager ? {
@@ -1187,10 +1204,13 @@ class TexasHoldemGame {
 const GAMES = {};
 
 app.post('/create_game', (req, res) => {
-    const { user_id, user_name, initial_chips, avatar, game_mode, small_blind, blind_duration, max_re_entry } = req.body;
+    const { user_id, user_name, initial_chips, avatar, game_mode, small_blind, blind_duration, max_re_entry, cash_hand_limit } = req.body;
     const chips = parseInt(initial_chips) || 1000;
+    const mode = game_mode || 'cash';
+    const handLimit = mode === 'cash' ? Number(cash_hand_limit) : null;
+    if (mode === 'cash' && (!Number.isSafeInteger(handLimit) || handLimit < 1 || handLimit > 1000)) return res.status(400).json({success:false,message:'現金局手數必須是 1～1000 的整數'});
     const gameId = Math.random().toString(36).substr(2, 8).toUpperCase();
-    GAMES[gameId] = new TexasHoldemGame(gameId, user_id, user_name, chips, game_mode || "cash", parseInt(small_blind) || 10, parseInt(blind_duration) || 600, parseInt(max_re_entry) ?? 2);
+    GAMES[gameId] = new TexasHoldemGame(gameId, user_id, user_name, chips, mode, parseInt(small_blind) || 10, parseInt(blind_duration) || 600, parseInt(max_re_entry) ?? 2, handLimit);
     GAMES[gameId].players[user_id].historyKey = req.get('X-History-Key') || '';
     if (avatar) GAMES[gameId].players[user_id].avatar = avatar;
     res.json({ success: true, game_id: gameId, game_state: GAMES[gameId].toJSON(user_id) });
@@ -1313,7 +1333,9 @@ app.post('/rebuy', (req, res) => {
     if (!Number.isSafeInteger(a) || a <= 0 || !Number.isSafeInteger(p.chips + a)) {
         return res.status(400).json({ success: false, message: '買入金額必須是有效的正整數' });
     }
+    if (game.cashHandLimit && game.handNumber >= game.cashHandLimit && game.gameState === 'game_over') return res.status(409).json({success:false,message:'本房間已完成結算，無法再補碼'});
     p.chips += a;
+    p.totalBuyIn += a;
     p.sittingOut = false;
     game.messages.push(`${p.name} 買入了 ${a}`);
     res.json({ success: true, game_state: game.toJSON(user_id) });

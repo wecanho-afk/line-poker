@@ -74,7 +74,8 @@ function proUpdate(state) {
     proState = state;
     updateHandSaveStatus(state);
     document.body.classList.toggle('playing', proView === 'table');
-    document.getElementById('table-meta').textContent = `第 ${state.hand_number || 0} 手　 •　 ${streetLabels[state.game_state] || state.game_state}　 •　 盲注 ${state.blinds?.small || 0} / ${state.blinds?.big || 0}`;
+    const handProgress=state.hand_limit?`第 ${state.hand_number || 0} / ${state.hand_limit} 手`:`第 ${state.hand_number || 0} 手`;
+    document.getElementById('table-meta').textContent = `${handProgress}　 •　 ${streetLabels[state.game_state] || state.game_state}　 •　 盲注 ${state.blinds?.small || 0} / ${state.blinds?.big || 0}`;
     const banner = document.getElementById('practice-context');
     banner.hidden = !state.practice;
     banner.textContent = state.practice ? `${state.practice.title}｜${state.practice.prompt}${state.practice.lesson ? '　解析：' + state.practice.lesson : ''}` : '';
