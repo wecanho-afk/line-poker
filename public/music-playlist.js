@@ -1,69 +1,24 @@
-/* Track references from the user-provided music catalog; audio is not copied. */
+/* Audio selected from the user-provided MapleMusicV3.0Final archive. */
 (function(root,factory){if(typeof module==='object'&&module.exports)module.exports=factory();else root.PokerMusicPlaylist=factory();})(typeof globalThis!=='undefined'?globalThis:this,function(){
  const tracks={
-  "normal": [
-    {
-      "title": "Floral Life",
-      "videoId": "s2_MAplvHeQ"
-    },
-    {
-      "title": "Above the Treetops",
-      "videoId": "F6LIFBVhObQ"
-    },
-    {
-      "title": "When the Morning Comes",
-      "videoId": "gfgBDs8z6WE"
-    },
-    {
-      "title": "Missing You",
-      "videoId": "2NoF8PHQJqQ"
-    },
-    {
-      "title": "Moonlight Shadow",
-      "videoId": "XYtHWyrVm30"
-    },
-    {
-      "title": "Fantastic Thinking",
-      "videoId": "49AZqVhXVeU"
-    },
-    {
-      "title": "Aquarium",
-      "videoId": "qtw0sIBLjrw"
-    },
-    {
-      "title": "Ariant",
-      "videoId": "w1RgDSoOajw"
-    },
-    {
-      "title": "Queen's Garden",
-      "videoId": "3r9s43TG9yA"
-    },
-    {
-      "title": "Raindrop Flower",
-      "videoId": "DhUdOO9UNwY"
-    }
+  normal:[
+   {title:'弓箭手村',src:'/audio/normal-01.mp3'},
+   {title:'魔法森林',src:'/audio/normal-02.mp3'},
+   {title:'魔法森林郊外',src:'/audio/normal-03.mp3'},
+   {title:'弓箭手村市集',src:'/audio/normal-04.mp3'},
+   {title:'耶雷弗',src:'/audio/normal-05.mp3'},
+   {title:'耶雷弗訓練場',src:'/audio/normal-06.mp3'},
+   {title:'水之都',src:'/audio/normal-07.mp3'},
+   {title:'玩具城',src:'/audio/normal-08.mp3'},
+   {title:'天空之城',src:'/audio/normal-09.mp3'},
+   {title:'神木村',src:'/audio/normal-10.mp3'}
   ],
-  "tense": [
-    {
-      "title": "Final Fight",
-      "videoId": "rEtDrkAYs68"
-    },
-    {
-      "title": "Time Attack",
-      "videoId": "AiaV9gA3i10"
-    },
-    {
-      "title": "Horntail",
-      "videoId": "WnLrTMmnyBc"
-    },
-    {
-      "title": "Gravity Lord Rise",
-      "videoId": "zhZ5IpkghWw"
-    },
-    {
-      "title": "Corrupted Blood",
-      "videoId": "do6QC9kkmv4"
-    }
+  tense:[
+   {title:'炎魔祭壇',src:'/audio/tense-01.mp3'},
+   {title:'希拉之塔',src:'/audio/tense-02.mp3'},
+   {title:'阿卡伊農祭壇',src:'/audio/tense-03.mp3'},
+   {title:'西格諾斯殿堂',src:'/audio/tense-04.mp3'},
+   {title:'皮卡啾祭壇',src:'/audio/tense-05.mp3'}
   ]
 };
  function create(random=Math.random){let mode='normal',normalIndex=0,bossIndex=-1,bag=[];

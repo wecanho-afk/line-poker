@@ -5,7 +5,7 @@
   const banner=document.createElement('div');banner.id='allin-announcement';banner.hidden=true;banner.setAttribute('role','status');banner.setAttribute('aria-live','polite');document.querySelector('.table-stage').prepend(banner);
   const strength=document.createElement('div');strength.id='my-hand-strength';strength.hidden=true;strength.innerHTML='<span>你的目前牌力 · 僅自己可見</span><strong></strong><small>底牌＋已發出的公共牌</small>';document.getElementById('action-status').after(strength);
   let handKey='',seen=new Set(),tense=false,hideTimer;
-  const music=PokerYouTubeMusic.create(button);
+  const music=PokerMusicPlayer.create(button);
   function setMode(mode){music.setMode(mode);}
   function clearEffect(){clearTimeout(hideTimer);banner.hidden=true;document.getElementById('poker-table').classList.remove('allin-impact');}
   function syncAtmosphere(state){
