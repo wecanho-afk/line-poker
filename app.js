@@ -250,6 +250,7 @@ class TexasHoldemGame {
         this.runoutDecision = null;
         this.runoutBoards = null;
         this.runoutCount = 1;
+        this.runoutSharedCount = 0;
         this.turnDeadline = 0;
         this.turnTimeout = null;
         this.lastRaiseAmount = 20; // 追蹤上一次加注的增量，初始為大盲
@@ -380,6 +381,7 @@ class TexasHoldemGame {
         this.runoutDecision = null;
         this.runoutBoards = null;
         this.runoutCount = 1;
+        this.runoutSharedCount = 0;
         
         if (this.tournamentManager) {
             this.tournamentManager.startTournament();
@@ -438,6 +440,7 @@ class TexasHoldemGame {
                 this.players[id].hand.push(...this.deck.deal(1));
             });
         }
+        this.assertCardIntegrity();
 
         history.begin(this);
         this.activePlayersInRound.forEach(id => {
@@ -580,6 +583,7 @@ class TexasHoldemGame {
 
     startRunout(runs=1) {
         this.cancelScheduledAction();this.runoutDecision=null;this.runoutCount=runs;
+        this.runoutSharedCount=this.communityCards.length;
         this.runoutBoards=Array.from({length:runs},()=>[...this.communityCards]);
         this.turnDeadline=0;this.scheduleAction('runout',900);
     }
@@ -589,9 +593,28 @@ class TexasHoldemGame {
         const current=this.runoutBoards[0].length,target=current===0?3:Math.min(5,current+1);
         for(const board of this.runoutBoards)board.push(...this.deck.deal(target-board.length));
         this.communityCards=[...this.runoutBoards[0]];
+        this.assertCardIntegrity();
         this.gameState=target===3?'flop':target===4?'turn':'river';
         this.messages.push(this.runoutCount===2?`兩次發牌進行至${target===3?'翻牌':target===4?'轉牌':'河牌'}`:`發出${target===3?'翻牌':target===4?'轉牌':'河牌'}`);
         if(target===5)this.determineWinner();else this.scheduleAction('runout',900);
+    }
+
+    assertCardIntegrity() {
+        if (!this.deck) return true;
+        const physicalCards = [...this.deck.cards, ...Object.values(this.players).flatMap(p => p.hand)];
+        if (this.runoutBoards?.length) {
+            physicalCards.push(...this.runoutBoards[0]);
+            for (let i = 1; i < this.runoutBoards.length; i++) {
+                physicalCards.push(...this.runoutBoards[i].slice(this.runoutSharedCount));
+            }
+        } else {
+            physicalCards.push(...this.communityCards);
+        }
+        const labels = physicalCards.map(String);
+        if (labels.length !== 52 || new Set(labels).size !== labels.length) {
+            throw new Error(`Card integrity failure: ${labels.length} cards, ${new Set(labels).size} unique`);
+        }
+        return true;
     }
 
     useTimeCard(userId) {
@@ -639,14 +662,17 @@ class TexasHoldemGame {
         if (this.gameState === 'pre_flop') {
             this.gameState = 'flop';
             this.communityCards.push(...this.deck.deal(3));
+            this.assertCardIntegrity();
             this.messages.push(`發出翻牌`);
         } else if (this.gameState === 'flop') {
             this.gameState = 'turn';
             this.communityCards.push(...this.deck.deal(1));
+            this.assertCardIntegrity();
             this.messages.push(`發出轉牌`);
         } else if (this.gameState === 'turn') {
             this.gameState = 'river';
             this.communityCards.push(...this.deck.deal(1));
+            this.assertCardIntegrity();
             this.messages.push(`發出河牌`);
         } else if (this.gameState === 'river') {
             this.determineWinner();
@@ -1154,6 +1180,7 @@ class TexasHoldemGame {
             min_raise: this.currentBetAmount + this.lastRaiseAmount,
             community_cards: this.communityCards.map(c => c.toString()),
             runout_boards: this.runoutBoards?.length===2?this.runoutBoards.map(board=>board.map(String)):null,
+            runout_shared_count: this.runoutBoards?.length===2 ? this.runoutSharedCount : 0,
             runout_choice: this.runoutDecision ? {
                 stage:this.runoutDecision.stage,
                 proposed_runs:this.runoutDecision.proposedRuns,
@@ -1444,3 +1471,4 @@ if (!process.env.NO_SERVER) {
 }
 
 module.exports = { app, TexasHoldemGame, Card, Deck, GAMES, broadcastState, server, io };
+

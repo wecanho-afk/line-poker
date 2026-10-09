@@ -85,6 +85,8 @@ function setup(game, scene, Card, Deck) {
     game.pot = hero.invested + villain.invested;
     const used = new Set([...scene.hero, ...scene.villain, ...scene.board]);
     game.deck = new Deck(); game.deck.cards = game.deck.cards.filter(c => !used.has(c.toString()));
+    game.handNumber = (game.handNumber || 0) + 1;
     history.begin(game); game.messages.push(scene.prompt); game.startTurnTimer();
 }
 module.exports = { scenarios, setup };
+

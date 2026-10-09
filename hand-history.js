@@ -17,7 +17,7 @@ function read(id) {
     catch (e) { if (e.code !== 'ENOENT') console.error('Hand history read failed:', e.message); return memory; }
 }
 function begin(game) {
-    game.currentHand = { id: randomUUID(), number: (game.handNumber = (game.handNumber || 0) + 1), started: new Date().toISOString(),
+    game.currentHand = { id: randomUUID(), number: game.handNumber || 1, started: new Date().toISOString(),
         gameId: game.gameId, blinds: clone(game.blinds), scenario: game.practice ? { id: game.practice.id, title: game.practice.title } : null,
         seats: game.activePlayersInRound.map(id => ({ id, name: game.players[id].name, chips: game.players[id].chips + game.players[id].invested,
             hand: game.players[id].hand.map(c => c.toString()), bot: game.players[id].isBot })), actions: [], finished: false };
@@ -59,3 +59,4 @@ function finish(game) {
     }
 }
 module.exports = { begin, capture, record, finish, read };
+

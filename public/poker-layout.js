@@ -52,7 +52,10 @@
     const area=byId('community-cards'),boards=state.runout_boards;
     area.classList.toggle('run-twice',Array.isArray(boards)&&boards.length===2);
     if(!Array.isArray(boards)||boards.length!==2)return;
-    area.innerHTML=boards.map((cards,index)=>`<div class="runout-lane"><b>${index+1}</b>${[0,1,2,3,4].map(i=>cards[i]?formatCard(cards[i]):'<div class="card-empty"></div>').join('')}</div>`).join('');
+    const shared=Math.max(0,Math.min(5,Number(state.runout_shared_count)||0));
+    const common=shared?`<div class="runout-common"><span>共同牌</span>${boards[0].slice(0,shared).map(c=>formatCard(c)).join('')}</div>`:'';
+    const lanes=boards.map((cards,index)=>`<div class="runout-lane"><b>${index+1}</b>${Array.from({length:5-shared},(_,offset)=>cards[shared+offset]?formatCard(cards[shared+offset]):'<div class="card-empty"></div>').join('')}</div>`).join('');
+    area.innerHTML=common+`<div class="runout-branches">${lanes}</div>`;
     area.setAttribute('aria-label','公共牌發兩次');
   }
   function renderTableFeatures(state){
@@ -114,3 +117,4 @@
     rail.classList.toggle('your-turn',mine);
   };
 })();
+

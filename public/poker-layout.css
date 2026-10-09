@@ -202,6 +202,9 @@ body.allin-hand .action-rail { border-color:#976c46; }
 #runout-choice-panel>div { display:grid;grid-template-columns:1fr 1fr;gap:7px; }
 #runout-choice-panel button { min-height:38px;background:#71562f;color:#fff3d7;border-color:#b88c4c; }
 .community-cards-area.run-twice { flex-direction:column;gap:5px;max-width:none; }
+.runout-common,.runout-branches { display:flex;align-items:center;justify-content:center;gap:5px; }
+.runout-common>span { color:#d8c7a8;font-size:10px;letter-spacing:.08em;white-space:nowrap; }
+.runout-branches { flex-direction:column; }
 .runout-lane { display:flex;align-items:center;justify-content:center;gap:4px; }
 .runout-lane>b { display:flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:#d2ad6d;color:#173127;font-size:11px;flex:0 0 auto; }
 .community-cards-area.run-twice .card,.community-cards-area.run-twice .card-empty { width:38px;height:52px;font-size:16px; }
@@ -222,3 +225,4 @@ body.allin-hand .action-rail { border-color:#976c46; }
 @media(max-width:560px) { .settlement-card { padding:14px 10px; }.settlement-head,.settlement-row { grid-template-columns:minmax(82px,1.2fr) repeat(3,minmax(60px,1fr));gap:4px;padding:8px 3px;font-size:.76rem; }.settlement-head { font-size:.67rem; } }
 .cash-hand-limit { display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid #777;border-radius:5px;background:#333;color:#ddd;font-size:.78rem; }
 .cash-hand-limit input { width:62px;min-width:62px;padding:5px;text-align:center; }
+

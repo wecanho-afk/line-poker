@@ -6,6 +6,15 @@ const games=[];
 const cards=text=>text.split(' ').map(c=>new Card(c[0],c[1]));
 function headsUp(){const g=new TexasHoldemGame('feature-'+games.length,'a','A',1000);games.push(g);g.addPlayer('b','B');return g;}
 
+test('each new round advances the hand number exactly once',()=>{
+ const g=headsUp();assert.equal(g.startGame()[0],true);
+ assert.equal(g.handNumber,1);assert.equal(g.currentHand.number,1);
+ g.cancelScheduledAction();g.gameState='waiting_for_next_round';g.startNewRound();
+ assert.equal(g.handNumber,2);assert.equal(g.currentHand.number,2);
+ g.startNewRound();assert.equal(g.handNumber,2);
+ g.cancelScheduledAction();
+});
+
 test('players enter with two time cards; every fiftieth dealt hand awards another and it extends only the current turn once',()=>{
  const g=headsUp();assert.equal(g.players.a.timeCards,2);assert.equal(g.players.b.timeCards,2);g.players.a.handsPlayed=49;assert.equal(g.startGame()[0],true);assert.equal(g.players.a.timeCards,3);
  const player=g.getCurrentPlayer();
@@ -37,6 +46,20 @@ test('trailing player proposes run once or twice and leader makes the final deci
  g.cancelScheduledAction();
 });
 
+test('run twice shares existing board cards without creating a fifth card of any rank',()=>{
+ const g=headsUp();g.startGame();g.cancelScheduledAction();
+ g.communityCards.push(...g.deck.deal(3));g.gameState='flop';
+ g.startRunout(2);assert.equal(g.runoutSharedCount,3);
+ g.advanceRunout();
+ assert.equal(g.runoutBoards[0].length,4);assert.equal(g.runoutBoards[1].length,4);
+ assert.deepEqual(g.runoutBoards[0].slice(0,3).map(String),g.runoutBoards[1].slice(0,3).map(String));
+ const physical=[...g.deck.cards,...Object.values(g.players).flatMap(p=>p.hand),...g.runoutBoards[0],...g.runoutBoards[1].slice(3)].map(String);
+ assert.equal(physical.length,52);assert.equal(new Set(physical).size,52);
+ assert.equal(physical.filter(c=>c[0]==='K').length,4);
+ assert.equal(g.toJSON('a').runout_shared_count,3);
+ g.cancelScheduledAction();
+});
+
 test('running twice splits each pot between boards and gives the first board the odd chip',()=>{
  const g=headsUp();g.addPlayer('c','C');
  Object.assign(g.players.a,{hand:cards('As Ad'),chips:0,invested:5,allIn:true});
@@ -50,3 +73,4 @@ test('running twice splits each pot between boards and gives the first board the
 });
 
 after(()=>{games.forEach(g=>g.cancelScheduledAction());io.close();server.close();});
+
