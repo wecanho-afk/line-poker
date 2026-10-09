@@ -10,6 +10,37 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
+const LINE_CHANNEL_ID = process.env.LINE_CHANNEL_ID || '2010219463';
+
+async function verifyLineUser(accessToken, expectedUserId, fetchImpl = fetch) {
+    if (typeof accessToken !== 'string' || accessToken.length < 20 || accessToken.length > 4096 || /\s/.test(accessToken)) return false;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
+    try {
+        const verificationUrl = new URL('https://api.line.me/oauth2/v2.1/verify');
+        verificationUrl.searchParams.set('access_token', accessToken);
+        const verificationResponse = await fetchImpl(verificationUrl, { signal: controller.signal });
+        if (!verificationResponse.ok) return false;
+        const verification = await verificationResponse.json();
+        if (String(verification.client_id) !== LINE_CHANNEL_ID || Number(verification.expires_in) <= 0) return false;
+        const profileResponse = await fetchImpl('https://api.line.me/v2/profile', {
+            headers: { Authorization: `Bearer ${accessToken}` }, signal: controller.signal
+        });
+        if (!profileResponse.ok) return false;
+        const profile = await profileResponse.json();
+        return profile.userId === expectedUserId;
+    } catch (error) {
+        console.warn('LINE session verification failed:', error.name || error.message);
+        return false;
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+function bearerToken(req) {
+    const match = /^Bearer ([^\s]+)$/.exec(req.get('Authorization') || '');
+    return match?.[1] || '';
+}
 
 const broadcastState = (gameId) => {
     const game = GAMES[gameId];
@@ -32,6 +63,7 @@ app.get('/health', (req, res) => {
 });
 app.use(express.static(path.join(__dirname, 'public')));
 app.use((req, res, next) => {
+    if (req.path === '/join_game') return next();
     const game = GAMES[req.body?.game_id];
     const player = game?.players[req.body?.user_id];
     if (player?.historyKey && player.historyKey !== req.get('X-History-Key')) return res.status(403).json({ success: false, message: '座位驗證失敗，請使用原本的瀏覽器' });
@@ -1248,23 +1280,43 @@ app.post('/create_game', (req, res) => {
     broadcastState(gameId);
 });
 
-app.post('/join_game', (req, res) => {
+app.post('/join_game', async (req, res) => {
     const { game_id, user_id, user_name, avatar } = req.body;
     const game = GAMES[game_id];
     if (!game) return res.status(404).json({ success: false, message: "房號不存在" });
     if (game.players[user_id]) {
-        if (game.players[user_id].historyKey && game.players[user_id].historyKey !== req.get('X-History-Key')) return res.status(403).json({ success: false, message: '請使用原本的瀏覽器加入此座位' });
+        const player = game.players[user_id];
+        const requestedKey = req.get('X-History-Key') || '';
+        let sessionTransferred = false;
+        if (player.historyKey && player.historyKey !== requestedKey) {
+            if (requestedKey.length < 16 || !await verifyLineUser(bearerToken(req), user_id)) {
+                return res.status(403).json({ success: false, message: '此座位在另一台裝置使用中；請先登入相同的 LINE 帳號' });
+            }
+            player.historyKey = requestedKey;
+            sessionTransferred = true;
+            const sockets = await io.in(game_id).fetchSockets();
+            for (const peer of sockets.filter(s => s.userId === user_id)) {
+                peer.emit('session_replaced', { game_id });
+                peer.to(game_id).emit('voice_user_left', peer.id);
+                peer.leave(game_id);
+                peer.leave(user_id);
+                peer.userId = null;
+                peer.gameId = null;
+                peer.historyKey = null;
+            }
+        }
         // Already in game, just allow reconnect
-        game.players[user_id].name = user_name || game.players[user_id].name;
-        const returning = game.players[user_id];
+        player.name = user_name || player.name;
+        const returning = player;
         if (returning.leftTable) {
             returning.leftTable = false;
             returning.waitingForNextRound = ['pre_flop','flop','turn','river','showdown'].includes(game.gameState) && returning.hand.length === 0;
             returning.sittingOut = returning.waitingForNextRound;
             game.checkEmptyRoom();
         }
-        if (avatar) game.players[user_id].avatar = avatar;
-        return res.json({ success: true, message: "重新連線", game_state: game.toJSON(user_id) });
+        if (avatar) player.avatar = avatar;
+        res.json({ success: true, message: sessionTransferred ? '已切換到此裝置' : '重新連線', session_transferred: sessionTransferred, game_state: game.toJSON(user_id) });
+        return broadcastState(game_id);
     }
     const [ok, msg] = game.addPlayer(user_id, user_name, avatar);
     if (ok) game.players[user_id].historyKey = req.get('X-History-Key') || '';
@@ -1439,6 +1491,7 @@ io.on('connection', socket => {
         socket.join(user_id); // 【修復】讓每個玩家也加入以自己 ID 命名的房間，用來接收私人手牌
         socket.userId = user_id;
         socket.gameId = game_id;
+        socket.historyKey = history_key;
         if (GAMES[game_id] && GAMES[game_id].players[user_id]) {
             const p = GAMES[game_id].players[user_id];
             // 如果遊戲進行中且玩家沒有手牌（中途加入），強制 sittingOut 等下一局
@@ -1474,6 +1527,6 @@ if (!process.env.NO_SERVER) {
     server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 }
 
-module.exports = { app, TexasHoldemGame, Card, Deck, GAMES, broadcastState, server, io };
+module.exports = { app, TexasHoldemGame, Card, Deck, GAMES, broadcastState, server, io, verifyLineUser };
 
 

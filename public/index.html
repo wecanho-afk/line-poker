@@ -429,6 +429,11 @@
                 updateUI(state);
             });
             socket.on('table_left', data => { if (data.game_id === gameId) returnToLobby(); });
+            socket.on('session_replaced', data => {
+                if (data.game_id !== gameId) return;
+                alert('此座位已切換到另一台裝置，本裝置已停止控制。');
+                returnToLobby();
+            });
             
             socket.on('voice_user_joined', async (remoteSocketId) => {
                 if (!localStream) return;
@@ -744,6 +749,12 @@
                 method,
                 headers: { 'Content-Type': 'application/json', 'X-History-Key': historyKey }
             };
+            if (path === '/join_game') {
+                try {
+                    const token = typeof liff !== 'undefined' && liff.isLoggedIn?.() ? liff.getAccessToken() : '';
+                    if (token) options.headers.Authorization = `Bearer ${token}`;
+                } catch (error) { console.warn('Unable to attach LINE session', error); }
+            }
             if (body) options.body = JSON.stringify(body);
             const res = await fetch(`${BACKEND_URL}${path}`, options);
             const result = await res.json();
@@ -794,6 +805,7 @@
                 if(socket) socket.emit('join_room', { game_id: gameId, user_id: userId, history_key: historyKey });
                 showGame();
                 updateUI(res.game_state);
+                if (res.session_transferred) alert('已從另一台裝置接手此座位');
             } else {
                 alert(res.message || '加入失敗');
             }
