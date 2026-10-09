@@ -83,7 +83,12 @@ body.playing .community-cards-area .card,body.playing .community-cards-area .car
 #lobby-return { margin-top:auto;background:transparent;border:1px solid #5b4841;color:#cdb4a9;font-size:12px;min-height:36px;padding:6px 12px; }
 [hidden] { display:none!important; }
 .scene-card,.review-card { background:#142b23;border-color:var(--line); }.scene-card h3 { font-size:20px; }.scene-card p,.muted { color:var(--muted); }.scene-filter select,.hand-list button { background:#142b23;border-color:var(--line); }.review-step { background:#0d2019; }.panel-top button,.review-actions button { background:#2b493b; }.scene-card { border-radius:16px; }.scene-tag { font-size:11px; }
-#rebuy-dialog,#leave-dialog,.modal-content { background:#142b23;border-color:#62715a;border-radius:16px;max-height:calc(100dvh - 28px);overflow:auto; }
+#rebuy-dialog,#leave-dialog,#voice-permission-dialog,.modal-content { background:#142b23;color:#edf2ed;border:1px solid #62715a;border-radius:16px;max-height:calc(100dvh - 28px);overflow:auto; }
+#voice-permission-dialog { width:min(90vw,390px);padding:22px; }
+#voice-permission-dialog::backdrop { background:#000b; }
+#voice-permission-dialog h2 { margin-top:0; }
+#voice-permission-dialog p { line-height:1.6; }
+.voice-permission-guide { color:#c7d2cb;font-size:13px; }
 @media (min-width:600px) and (max-height:600px) {
  .header,body.playing .header { padding:5px max(12px,env(safe-area-inset-right)) 5px max(12px,env(safe-area-inset-left));min-height:38px; }
  .header h1 { font-size:17px!important; }.header button { min-height:28px; }.header small { font-size:10px; }
@@ -225,4 +230,5 @@ body.allin-hand .action-rail { border-color:#976c46; }
 @media(max-width:560px) { .settlement-card { padding:14px 10px; }.settlement-head,.settlement-row { grid-template-columns:minmax(82px,1.2fr) repeat(3,minmax(60px,1fr));gap:4px;padding:8px 3px;font-size:.76rem; }.settlement-head { font-size:.67rem; } }
 .cash-hand-limit { display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid #777;border-radius:5px;background:#333;color:#ddd;font-size:.78rem; }
 .cash-hand-limit input { width:62px;min-width:62px;padding:5px;text-align:center; }
+
 

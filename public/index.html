@@ -353,6 +353,16 @@
             </form>
         </dialog>
 
+        <dialog id="voice-permission-dialog" aria-labelledby="voice-permission-title">
+            <h2 id="voice-permission-title">無法開啟麥克風</h2>
+            <p id="voice-permission-message"></p>
+            <p class="voice-permission-guide">若曾拒絕權限，請到手機「設定 → LINE → 麥克風」開啟後，回到此頁重試。</p>
+            <div class="rebuy-actions">
+                <button type="button" class="btn-blue" onclick="document.getElementById('voice-permission-dialog').close()">關閉</button>
+                <button type="button" id="voice-open-browser" class="btn-green" onclick="openVoiceExternally()">用瀏覽器開啟</button>
+            </div>
+        </dialog>
+
         <div id="settlementModal" class="modal">
             <div class="modal-content settlement-card">
                 <h2 id="settlementTitle" style="color: gold; margin-top: 0;">🏆 結算 🏆</h2>
@@ -455,23 +465,78 @@
             });
         }
 
-        async function toggleVoiceChat() {
-            if (!socket) return alert('尚未連線');
-            if (localStream) {
-                localStream.getTracks().forEach(t => t.stop());
-                localStream = null;
-                socket.emit('leave_voice');
-                Object.values(peers).forEach(p => p.close());
-                for (let key in peers) delete peers[key];
-                document.getElementById('voice-chat-btn').textContent = '📞 開啟通話';
-                document.getElementById('voice-chat-btn').classList.replace('btn-red', 'btn-blue');
+        function setAudioSession(type) {
+            try { if (navigator.audioSession) navigator.audioSession.type = type; } catch (e) { console.warn('Audio session switch failed', e); }
+        }
+
+        function stopVoiceChat() {
+            if (localStream) localStream.getTracks().forEach(t => t.stop());
+            localStream = null;
+            if (socket) socket.emit('leave_voice');
+            Object.values(peers).forEach(p => p.close());
+            for (const key in peers) delete peers[key];
+            setAudioSession('playback');
+            const button = document.getElementById('voice-chat-btn');
+            button.textContent = '📞 開啟通話';
+            button.classList.replace('btn-red', 'btn-blue');
+            button.disabled = false;
+        }
+
+        function showVoicePermissionError(error) {
+            console.error('Microphone access failed', error);
+            const dialog = document.getElementById('voice-permission-dialog');
+            const message = document.getElementById('voice-permission-message');
+            const unavailable = !window.isSecureContext || !navigator.mediaDevices?.getUserMedia || !window.RTCPeerConnection;
+            if (unavailable) {
+                message.textContent = '目前的 LINE 視窗不支援語音通話，請改用 Safari 或 Chrome 開啟。';
+            } else if (error?.name === 'NotAllowedError' || error?.name === 'SecurityError') {
+                message.textContent = '麥克風權限已被拒絕。開啟手機的 LINE 麥克風權限後再試，或改用外部瀏覽器。';
+            } else if (error?.name === 'NotFoundError') {
+                message.textContent = '找不到可使用的麥克風，請確認裝置或耳機麥克風可正常使用。';
             } else {
+                message.textContent = '麥克風暫時無法啟動，請關閉其他通話程式後重試，或改用外部瀏覽器。';
+            }
+            if (dialog?.showModal) dialog.showModal();
+            else alert(message.textContent);
+        }
+
+        function openVoiceExternally() {
+            const url = new URL('/', window.location.origin);
+            if (gameId) url.searchParams.set('room', gameId);
+            document.getElementById('voice-permission-dialog').close();
+            if (typeof liff !== 'undefined' && liff.isInClient?.()) liff.openWindow({ url: url.href, external: true });
+            else window.open(url.href, '_blank', 'noopener');
+        }
+
+        async function toggleVoiceChat() {
+            if (!socket?.connected) return alert('尚未連線，請稍後再試');
+            if (localStream) {
+                stopVoiceChat();
+            } else {
+                const button = document.getElementById('voice-chat-btn');
                 try {
-                    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia || !window.RTCPeerConnection) {
+                        throw new DOMException('Voice chat is unavailable in this browser', 'NotSupportedError');
+                    }
+                    button.disabled = true;
+                    button.textContent = '🎙️ 等待授權…';
+                    const music = document.getElementById('music-audio');
+                    if (music && !music.paused) music.pause();
+                    setAudioSession('play-and-record');
+                    localStream = await navigator.mediaDevices.getUserMedia({
+                        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+                        video: false
+                    });
+                    if (!localStream.getAudioTracks().length) throw new DOMException('No audio track', 'NotFoundError');
                     socket.emit('join_voice');
-                    document.getElementById('voice-chat-btn').textContent = '📞 關閉通話';
-                    document.getElementById('voice-chat-btn').classList.replace('btn-blue', 'btn-red');
-                } catch (e) { alert('麥克風存取失敗，請確認權限'); }
+                    button.textContent = '📞 關閉通話';
+                    button.classList.replace('btn-blue', 'btn-red');
+                } catch (e) {
+                    stopVoiceChat();
+                    showVoicePermissionError(e);
+                } finally {
+                    button.disabled = false;
+                }
             }
         }
 
@@ -488,9 +553,11 @@
                     audio = document.createElement('audio');
                     audio.id = 'audio-' + remoteSocketId;
                     audio.autoplay = true;
+                    audio.setAttribute('playsinline', '');
                     document.body.appendChild(audio);
                 }
                 audio.srcObject = e.streams[0];
+                audio.play().catch(() => {});
             };
             pc.oniceconnectionstatechange = () => {
                 if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
@@ -502,6 +569,8 @@
             };
             return pc;
         }
+
+        window.addEventListener('pagehide', () => { if (localStream) stopVoiceChat(); });
 
         function startTimerUI(state) {
             if (timerInterval) clearInterval(timerInterval);
@@ -1101,3 +1170,4 @@
 <script src="/poker-atmosphere.js"></script>
 </body>
 </html>
+

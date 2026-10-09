@@ -23,6 +23,10 @@ const broadcastState = (gameId) => {
 
 app.use(cors());
 app.use(express.json());
+app.use((req, res, next) => {
+    res.set('Permissions-Policy', 'microphone=(self)');
+    next();
+});
 app.get('/health', (req, res) => {
     res.set('Cache-Control', 'no-store').json({ status: 'ok', revision: process.env.RENDER_GIT_COMMIT || 'local' });
 });
@@ -1471,4 +1475,5 @@ if (!process.env.NO_SERVER) {
 }
 
 module.exports = { app, TexasHoldemGame, Card, Deck, GAMES, broadcastState, server, io };
+
 
