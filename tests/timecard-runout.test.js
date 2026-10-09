@@ -13,7 +13,8 @@ test('players enter with two time cards; every fiftieth dealt hand awards anothe
  const before=g.turnDeadline,sequence=g.turnSequence,cardsBefore=player.timeCards;
  assert.equal(g.useTimeCard(player.userId)[0],true);
  assert.equal(g.turnDeadline,before+30000);assert.equal(player.timeCards,cardsBefore-1);assert.equal(player.timeCardTurnId,sequence+1);
- assert.equal(g.useTimeCard(player.userId)[0],false);
+ assert.equal(g.latestVoice,'time');const actionCount=g.actionCount;
+ assert.equal(g.useTimeCard(player.userId)[0],false);assert.equal(g.actionCount,actionCount);assert.equal(g.latestVoice,'time');
  g.cancelScheduledAction();
 });
 

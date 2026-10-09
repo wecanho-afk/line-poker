@@ -600,7 +600,7 @@ class TexasHoldemGame {
         if((player.timeCards||0)<1)return [false,'沒有可用的時間卡'];
         if(player.timeCardTurnId===this.turnSequence)return [false,'本回合已使用過時間卡'];
         if(pending.due<=Date.now())return [false,'本回合時間已結束'];
-        player.timeCards--;this.turnSequence=(this.turnSequence||0)+1;player.timeCardTurnId=this.turnSequence;pending.due+=30000;this.turnDeadline=pending.due;this.actionCount++;
+        player.timeCards--;this.turnSequence=(this.turnSequence||0)+1;player.timeCardTurnId=this.turnSequence;pending.due+=30000;this.turnDeadline=pending.due;this.actionCount++;this.latestVoice='time';
         if(this.turnTimeout)clearTimeout(this.turnTimeout);
         const scheduled=pending;this.turnTimeout=setTimeout(()=>{if(this.scheduledAction===scheduled)this.advanceDueAction();},Math.max(0,pending.due-Date.now()));
         this.messages.push(`${player.name} 使用 1 張時間卡，增加 30 秒`);
