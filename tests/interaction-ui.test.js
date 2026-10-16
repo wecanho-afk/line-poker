@@ -11,6 +11,13 @@ test('pot shortcuts submit immediately without focusing the numeric keyboard',()
  assert.doesNotMatch(quick,/\.focus\(\)/);
 });
 
+test('each state update restores fold availability after a pending action',()=>{
+ const html=fs.readFileSync(path.join(__dirname,'../public/index.html'),'utf8');
+ assert.doesNotMatch(html,/querySelectorAll\('button'\)\.forEach\(button => button\.disabled = true\)/);
+ assert.match(html,/button\[onclick=\\"performAction\('fold'\)\\"\][\s\S]*?disabled = actionUnavailable/);
+ assert.match(html,/controls\?\.setAttribute\('aria-busy', 'true'\)/);
+});
+
 test('card themes include portrait face cards and the reaction client is loaded',()=>{
  const html=fs.readFileSync(path.join(__dirname,'../public/index.html'),'utf8');
  const themes=fs.readFileSync(path.join(__dirname,'../public/card-themes.js'),'utf8');

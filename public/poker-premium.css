@@ -140,6 +140,7 @@ body.playing .poker-table.hand-hit-effect { animation:hand-table-glow 1.7s ease-
 #time-card-btn { background:#ffffff04;color:#b8cbbb;border-color:#ffffff12;font-size:11px;min-height:34px; }
 #time-card-btn:disabled { opacity:.6;background:transparent;color:#879a8f; }
 .controls { gap:9px!important; }.controls button { min-height:46px;font-size:13px;border-radius:8px; }
+.controls[aria-busy="true"] { pointer-events:none;opacity:.68; }
 .primary-actions button:first-child { background:#442d32;border-color:#86515955;color:#d6a5aa; }
 .quick-actions button { background:#ffffff04;border-color:#ffffff14;color:#aabeb0;font-size:10px!important;border-radius:6px; }
 .raise-label { font-size:10px;color:#8ba494;margin-top:5px; }.controls input { border-radius:8px;border-color:#8d9c7840;background:#081911b3;font-size:14px;color:#e6d5ae; }

@@ -919,7 +919,6 @@
             actionSubmissionBusy = true;
             const controls = document.getElementById('game-controls');
             controls?.setAttribute('aria-busy', 'true');
-            controls?.querySelectorAll('button').forEach(button => button.disabled = true);
             try {
                 const res = await api('/game_action', 'POST', {
                     game_id: gameId,
@@ -954,8 +953,8 @@
             if(suit==='d') suitIcon='♦\uFE0E';
             if(suit==='c') suitIcon='♣\uFE0E';
             return `<div class="card ${isRed ? 'red' : ''} ${isNew ? 'animate-deal' : ''}" data-suit="${suit}" data-rank="${cardStr[0]}">
-                        <span style="font-size:0.8em; align-self:flex-start; margin-left:2px;">${rank}</span>
-                        <span style="font-size:1.5em;">${suitIcon}</span>
+                        <span class="card-rank">${rank}</span>
+                        <span class="card-suit">${suitIcon}</span>
                     </div>`;
         }
 
@@ -1172,11 +1171,13 @@
 
             proUpdate(state);
             const callNeeded = Math.max(0, state.current_bet_amount - (me?.current_bet || 0));
-            document.querySelector("button[onclick=\"performAction('check')\"]").disabled = callNeeded > 0;
+            const actionUnavailable = !isMyTurn || !canAction || actionSubmissionBusy;
+            document.querySelector("button[onclick=\"performAction('fold')\"]").disabled = actionUnavailable;
+            document.querySelector("button[onclick=\"performAction('check')\"]").disabled = actionUnavailable || callNeeded > 0;
             const callButton = document.querySelector("button[onclick=\"performAction('call')\"]");
-            callButton.disabled = callNeeded === 0;
+            callButton.disabled = actionUnavailable || callNeeded === 0;
             callButton.textContent = '跟注 ' + Math.min(callNeeded, me?.chips || 0);
-            document.querySelectorAll("button[onclick^='setQuickBet'], button[onclick=\"performAction('raise')\"]").forEach(b => b.disabled = me?.can_raise === false || (me?.chips || 0) + (me?.current_bet || 0) <= state.current_bet_amount);
+            document.querySelectorAll("button[onclick^='setQuickBet'], button[onclick=\"performAction('raise')\"]").forEach(b => b.disabled = actionUnavailable || me?.can_raise === false || (me?.chips || 0) + (me?.current_bet || 0) <= state.current_bet_amount);
 
             // Game sound effects (TTS)
             if (state.action_count !== undefined && state.action_count > lastActionCount) {
