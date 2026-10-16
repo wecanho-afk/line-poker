@@ -954,6 +954,7 @@
             if(suit==='c') suitIcon='♣\uFE0E';
             return `<div class="card ${isRed ? 'red' : ''} ${isNew ? 'animate-deal' : ''}" data-suit="${suit}" data-rank="${cardStr[0]}">
                         <span class="card-rank">${rank}</span>
+                        ${window.renderCardFaceArt ? window.renderCardFaceArt(cardStr[0]) : '<span class="card-art" aria-hidden="true"></span>'}
                         <span class="card-suit">${suitIcon}</span>
                     </div>`;
         }
@@ -1204,6 +1205,7 @@
 <script src="/music-playlist.js"></script>
 <script src="/music-player.js"></script>
 <script src="/poker-atmosphere.js"></script>
+<script src="/card-face-art.js"></script>
 <script src="/card-themes.js"></script>
 <script src="/table-reactions.js"></script>
 </body>

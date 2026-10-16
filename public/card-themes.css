@@ -1,12 +1,10 @@
-/* Theme-scoped variables also let the picker preview every design. */
-[data-card-theme] { --card-paper:linear-gradient(135deg,#fffdf7,#eae7dc);--card-ink:#1d302a;--card-red:#b84147;--card-edge:#f8f2e5;--card-back:repeating-linear-gradient(45deg,#263b48 0 2px,#1b2d38 2px 5px);--card-back-ink:#d9c38c;--card-diamond:var(--card-red);--card-club:var(--card-ink); }
-[data-card-theme="four-color"] { --card-paper:linear-gradient(135deg,#ffffff,#eaf0f2);--card-ink:#202e38;--card-red:#ce3044;--card-edge:#fff;--card-back:repeating-linear-gradient(45deg,#203e48 0 2px,#325869 2px 5px);--card-diamond:#276ed0;--card-club:#148257; }
-[data-card-theme="royal"] { --card-paper:radial-gradient(circle at 50% 53%,#f8e8bd 0 18%,transparent 19%),linear-gradient(135deg,#fffdf2,#e8d3a7);--card-ink:#243c5d;--card-red:#a72c42;--card-edge:#c39b4a;--card-back:repeating-conic-gradient(from 45deg,#7c1731 0 25%,#a99760 0 50%) 0/10px 10px;--card-back-ink:#fff0bd; }
-[data-card-theme="casino"] { --card-paper:#fff;--card-ink:#101418;--card-red:#df1835;--card-edge:#fff;--card-back:radial-gradient(circle,#fff 0 1px,transparent 2px) 0 0/7px 7px,#d51335;--card-back-ink:#fff; }
-[data-card-theme="midnight"] { --card-paper:linear-gradient(145deg,#17202a,#05080d);--card-ink:#63e7ff;--card-red:#ff5f93;--card-edge:#567f8a;--card-back:linear-gradient(135deg,#9f4bff22 25%,transparent 25%) 0 0/8px 8px,linear-gradient(315deg,#36e5ff22 25%,transparent 25%) 0 0/8px 8px,#0a101b;--card-back-ink:#74eaff;--card-diamond:#a98aff;--card-club:#5de1b4; }
-[data-card-theme="ocean"] { --card-paper:linear-gradient(135deg,#fcffff,#d9e9f3);--card-ink:#153d68;--card-red:#b43d66;--card-edge:#c7deed;--card-back:repeating-linear-gradient(45deg,#20466e 0 2px,#13314f 2px 5px);--card-back-ink:#d1eafa; }
-[data-card-theme="burgundy"] { --card-paper:linear-gradient(135deg,#fff7e9,#eadbc9);--card-ink:#3b2e2d;--card-red:#923e4e;--card-edge:#f0d7bd;--card-back:repeating-linear-gradient(45deg,#67303d 0 2px,#442432 2px 5px); }
-[data-card-theme="mint"] { --card-paper:linear-gradient(135deg,#f4fff8,#d7eddd);--card-ink:#165748;--card-red:#b44e61;--card-edge:#c3e0c9;--card-back:repeating-linear-gradient(45deg,#286754 0 2px,#194c40 2px 5px);--card-back-ink:#cef1de; }
+/* Six approved card faces. The same rules power the table and the picker preview. */
+[data-card-theme] { --card-paper:linear-gradient(135deg,#fff,#efefeb);--card-ink:#15251f;--card-red:#c52f43;--card-edge:#fff;--card-back:repeating-linear-gradient(45deg,#263b48 0 2px,#1b2d38 2px 5px);--card-back-ink:#d9c38c;--card-diamond:var(--card-red);--card-club:var(--card-ink); }
+[data-card-theme="royal"] { --card-paper:radial-gradient(circle at 50% 52%,#fff7d7,#ead6a7);--card-ink:#172a25;--card-red:#bd3049;--card-edge:#c79d4e;--card-back:repeating-conic-gradient(from 45deg,#7c1731 0 25%,#b69c5b 0 50%) 0/10px 10px;--card-back-ink:#fff0bd; }
+[data-card-theme="casino"] { --card-paper:radial-gradient(circle at 50% 44%,#26312c,#0d1210 72%);--card-ink:#f2e5bc;--card-red:#ed5364;--card-edge:#d5b665;--card-back:repeating-linear-gradient(45deg,#171d1a 0 3px,#b5944733 3px 5px);--card-back-ink:#d5b665;--card-diamond:var(--card-red);--card-club:var(--card-ink); }
+[data-card-theme="four-color"] { --card-paper:#172536;--card-ink:#fff;--card-red:#fff;--card-edge:#ffffff70;--card-back:repeating-linear-gradient(45deg,#203e48 0 2px,#325869 2px 5px);--card-back-ink:#fff;--card-diamond:#fff;--card-club:#fff; }
+[data-card-theme="midnight"] { --card-paper:linear-gradient(145deg,#17212b,#05080c);--card-ink:#65e7ff;--card-red:#ff5c91;--card-edge:#65e7ff;--card-back:linear-gradient(135deg,#9f4bff22 25%,transparent 25%) 0 0/8px 8px,linear-gradient(315deg,#36e5ff22 25%,transparent 25%) 0 0/8px 8px,#0a101b;--card-back-ink:#74eaff;--card-diamond:#af83ff;--card-club:#55e2a6; }
+[data-card-theme="burgundy"] { --card-paper:radial-gradient(circle at 46% 38%,#862b48,#431120 76%);--card-ink:#f0d5a7;--card-red:#ffb1b8;--card-edge:#d1a769;--card-back:repeating-linear-gradient(45deg,#6c1f38 0 2px,#3a0d1c 2px 5px);--card-back-ink:#e3bc7d;--card-diamond:var(--card-red);--card-club:var(--card-ink); }
 body[data-card-theme] .card,.theme-option .card { background:var(--card-paper);color:var(--card-ink);border-color:var(--card-edge); }
 body[data-card-theme] .card.red,.theme-option .card.red { color:var(--card-red); }
 body[data-card-theme] .card[data-suit="d"],.theme-option .card[data-suit="d"] { color:var(--card-diamond); }
@@ -15,22 +13,54 @@ body[data-card-theme] .card-back,.theme-option .card-back { background:var(--car
 body[data-card-theme] #community-cards .board-dealing::after { background:var(--card-back);color:var(--card-back-ink);border-color:var(--card-edge); }
 body[data-card-theme] .card::after,.theme-option .card::after { background:var(--card-back); }
 .theme-option .card::after { display:none; }
-body[data-card-theme] .card:not(.card-back),.theme-option .card:not(.card-back) { position:relative;font-family:Georgia,'Times New Roman',serif;font-weight:900;text-shadow:none; }
-body[data-card-theme] .card-rank,.theme-option .card-rank { position:absolute;z-index:2;left:9%;top:5%;font-size:.68em;line-height:1;letter-spacing:-.06em; }
-body[data-card-theme] .card-suit,.theme-option .card-suit { position:relative;z-index:2;display:block;font-size:1.15em;line-height:1;transform:translateY(17%); }
-body[data-card-theme] .card[data-rank="J"],body[data-card-theme] .card[data-rank="Q"],body[data-card-theme] .card[data-rank="K"],.theme-option .card[data-rank="J"],.theme-option .card[data-rank="Q"],.theme-option .card[data-rank="K"] { overflow:hidden;isolation:isolate; }
-body[data-card-theme] .card[data-rank="J"]::before,.theme-option .card[data-rank="J"]::before { content:'⚔'; }
-body[data-card-theme] .card[data-rank="Q"]::before,.theme-option .card[data-rank="Q"]::before { content:'♛'; }
-body[data-card-theme] .card[data-rank="K"]::before,.theme-option .card[data-rank="K"]::before { content:'♚'; }
-body[data-card-theme] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"])::before,.theme-option .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"])::before { position:absolute;inset:22% 12% 9%;display:grid;place-items:center;border:1px solid currentColor;border-radius:40% 40% 12% 12%;font-family:Georgia,serif;font-size:1.15em;line-height:1;opacity:0;z-index:1; }
-body[data-card-theme="royal"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"])::before,.theme-option[data-card-theme="royal"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"])::before { opacity:.9;border:2px double #ad8439;background:repeating-linear-gradient(45deg,#b78b3620 0 2px,transparent 2px 5px);box-shadow:inset 0 0 0 1px #fff7d055;font-size:1.2em; }
-body[data-card-theme="royal"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-suit,.theme-option[data-card-theme="royal"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-suit { position:absolute;right:7%;bottom:5%;font-size:.58em;transform:none; }
-body[data-card-theme="casino"] .card:not(.card-back),.theme-option[data-card-theme="casino"] .card:not(.card-back) { font-family:Arial Black,Arial,sans-serif; }
-body[data-card-theme="casino"] .card-rank,.theme-option[data-card-theme="casino"] .card-rank { left:7%;top:4%;font-size:.82em; }
-body[data-card-theme="casino"] .card-suit,.theme-option[data-card-theme="casino"] .card-suit { font-size:1.25em;transform:translateY(18%); }
-body[data-card-theme="midnight"] .card,.theme-option[data-card-theme="midnight"] .card { box-shadow:inset 0 0 12px color-mix(in srgb,currentColor 18%,transparent),0 0 8px color-mix(in srgb,currentColor 18%,transparent); }
+body[data-card-theme] .card:not(.card-back),.theme-option .card:not(.card-back) { position:relative;overflow:hidden;isolation:isolate;font-family:Arial Black,Arial,sans-serif;font-weight:900;text-shadow:none; }
+body[data-card-theme] .card-rank,.theme-option .card-rank { position:absolute;z-index:4;left:9%;top:6%;font-size:.68em;line-height:1;letter-spacing:-.06em; }
+body[data-card-theme] .card-suit,.theme-option .card-suit { position:absolute;z-index:4;left:50%;top:53%;font-size:1.45em;line-height:1;transform:translate(-50%,-43%); }
+.card-art { display:none;position:absolute;z-index:2;inset:23% 13% 15%;place-items:center;line-height:1;pointer-events:none; }
+.card-art .face-art { display:none;width:100%;height:100%;overflow:visible; }
+.card-art .skin { fill:#e7b67c; }.card-art .cloth,.card-art .solid { fill:currentColor; }.card-art .gold { fill:#d7aa50; }.card-art .paper { fill:#fff9df; }
+.card-art .line,.card-art .fine { fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round; }.card-art .line { stroke-width:3; }.card-art .fine { stroke-width:1.7; }
+
+/* European court: light ivory stock, gold frame and three colourful court symbols. */
+body[data-card-theme="royal"] .card:not(.card-back),.theme-option[data-card-theme="royal"] .card:not(.card-back) { border-radius:13%;box-shadow:inset 0 0 0 2px #fff6ca,inset 0 0 0 3px #b89046,0 3px 7px #001a154a;font-family:Georgia,'Times New Roman',serif; }
+body[data-card-theme="royal"] .card-art,.theme-option[data-card-theme="royal"] .card-art { border:1px solid #b89046;border-radius:46% 46% 14% 14%;background:repeating-linear-gradient(45deg,#b18b3810 0 3px,transparent 3px 7px); }
+body[data-card-theme="royal"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-art,.theme-option[data-card-theme="royal"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-art { display:grid; }
+body[data-card-theme="royal"] .face-art-royal,.theme-option[data-card-theme="royal"] .face-art-royal { display:block; }
+body[data-card-theme="royal"] .card-art .cloth,.theme-option[data-card-theme="royal"] .card-art .cloth { fill:currentColor; }
+
+/* Black-gold casino: matte cards and three separate chip, star and crown emblems. */
+body[data-card-theme="casino"] .card:not(.card-back),.theme-option[data-card-theme="casino"] .card:not(.card-back) { border-radius:10%;box-shadow:inset 0 0 0 2px #0d1210,inset 0 0 0 3px #806c3a,0 3px 8px #0008;font-family:Georgia,'Times New Roman',serif; }
+body[data-card-theme="casino"] .card-rank,.theme-option[data-card-theme="casino"] .card-rank { color:#f6e9c0; }
+body[data-card-theme="casino"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-art,.theme-option[data-card-theme="casino"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-art { display:grid;color:#d5b665;filter:drop-shadow(0 2px 3px #000); }
+body[data-card-theme="casino"] .face-art-casino,.theme-option[data-card-theme="casino"] .face-art-casino { display:block; }
+body[data-card-theme="casino"] .card-art .gold,body[data-card-theme="casino"] .card-art .solid,.theme-option[data-card-theme="casino"] .card-art .gold,.theme-option[data-card-theme="casino"] .card-art .solid { fill:#d5b665; }
+body[data-card-theme="casino"] .card-art .paper,.theme-option[data-card-theme="casino"] .card-art .paper { fill:#171e1b; }
+body[data-card-theme="casino"] .card-art .line,body[data-card-theme="casino"] .card-art .fine,.theme-option[data-card-theme="casino"] .card-art .line,.theme-option[data-card-theme="casino"] .card-art .fine { stroke:#d5b665; }
+
+/* Four-colour deck: the approved classic layout on solid suit-coloured stock. */
+body[data-card-theme="four-color"] .card:not(.card-back),.theme-option[data-card-theme="four-color"] .card:not(.card-back) { color:#fff;border-color:#ffffff70;box-shadow:inset 0 0 0 2px #ffffff18,inset 0 -8px 18px #0002,0 3px 7px #001a154a; }
+body[data-card-theme="four-color"] .card[data-suit="s"],.theme-option[data-card-theme="four-color"] .card[data-suit="s"] { background:#172536; }
+body[data-card-theme="four-color"] .card[data-suit="c"],.theme-option[data-card-theme="four-color"] .card[data-suit="c"] { background:#14734e; }
+body[data-card-theme="four-color"] .card[data-suit="d"],.theme-option[data-card-theme="four-color"] .card[data-suit="d"] { background:#2865c5; }
+body[data-card-theme="four-color"] .card[data-suit="h"],.theme-option[data-card-theme="four-color"] .card[data-suit="h"] { background:#c62b45; }
+
+/* Midnight geometry: neon ink and a different angular mark for each face card. */
+body[data-card-theme="midnight"] .card:not(.card-back),.theme-option[data-card-theme="midnight"] .card:not(.card-back) { border-color:currentColor;box-shadow:inset 0 0 12px color-mix(in srgb,currentColor 18%,transparent),0 0 8px color-mix(in srgb,currentColor 22%,transparent); }
 body[data-card-theme="midnight"] .card-rank,body[data-card-theme="midnight"] .card-suit,.theme-option[data-card-theme="midnight"] .card-rank,.theme-option[data-card-theme="midnight"] .card-suit { text-shadow:0 0 5px currentColor; }
-body[data-card-theme="burgundy"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"])::before,.theme-option[data-card-theme="burgundy"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"])::before { opacity:.34;border-style:double;background:radial-gradient(circle,#a56d5122,transparent 65%); }
+body[data-card-theme="midnight"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-art,.theme-option[data-card-theme="midnight"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-art { display:grid;filter:drop-shadow(0 0 4px currentColor); }
+body[data-card-theme="midnight"] .face-art-midnight,.theme-option[data-card-theme="midnight"] .face-art-midnight { display:block; }
+body[data-card-theme="midnight"] .face-art-midnight *, .theme-option[data-card-theme="midnight"] .face-art-midnight * { fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round; }
+
+/* Burgundy engraving: dark wine stock with horse, rose and crowned-lion emblems. */
+body[data-card-theme="burgundy"] .card:not(.card-back),.theme-option[data-card-theme="burgundy"] .card:not(.card-back) { border-radius:7%;box-shadow:inset 0 0 0 2px #5c172a,inset 0 0 0 3px #d1a76977,inset 0 0 18px #21050caa,0 3px 8px #21060d99;font-family:Georgia,'Times New Roman',serif; }
+body[data-card-theme="burgundy"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-art,.theme-option[data-card-theme="burgundy"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-art { display:grid;border:3px double #e4c38888;border-radius:50% 50% 12% 12%;color:#f0d5a7;filter:drop-shadow(0 2px 2px #26050c); }
+body[data-card-theme="burgundy"] .face-art-burgundy,.theme-option[data-card-theme="burgundy"] .face-art-burgundy { display:block; }
+body[data-card-theme="burgundy"] .card-art .cloth,.theme-option[data-card-theme="burgundy"] .card-art .cloth { fill:#e4c388;fill-opacity:.18;stroke:#e4c388;stroke-width:1.7; }
+body[data-card-theme="burgundy"] .card-art .gold,body[data-card-theme="burgundy"] .card-art .solid,.theme-option[data-card-theme="burgundy"] .card-art .gold,.theme-option[data-card-theme="burgundy"] .card-art .solid { fill:#d7ae6d; }
+body[data-card-theme="burgundy"] .card-art .line,body[data-card-theme="burgundy"] .card-art .fine,.theme-option[data-card-theme="burgundy"] .card-art .line,.theme-option[data-card-theme="burgundy"] .card-art .fine { stroke:#f0d5a7; }
+
+/* Face-card themes keep the sole suit mark clear in the lower-right corner. */
+body[data-card-theme="royal"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-suit,body[data-card-theme="casino"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-suit,body[data-card-theme="midnight"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-suit,body[data-card-theme="burgundy"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-suit,.theme-option[data-card-theme="royal"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-suit,.theme-option[data-card-theme="casino"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-suit,.theme-option[data-card-theme="midnight"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-suit,.theme-option[data-card-theme="burgundy"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-suit { left:auto;right:7%;top:auto;bottom:5%;font-size:.58em;transform:none; }
 .header #card-theme-toggle { white-space:nowrap; }
 #card-theme-dialog { width:min(650px,94vw);padding:25px;max-height:90dvh;overflow:auto;background:linear-gradient(145deg,#1b3029,#0c1d1a);color:#efe4cf;border:1px solid #c7aa6e66;border-radius:18px; }
 #card-theme-dialog::backdrop { background:#030b0cba;backdrop-filter:blur(6px); }
@@ -45,7 +75,7 @@ body[data-card-theme="burgundy"] .card:is([data-rank="J"],[data-rank="Q"],[data-
 .theme-selection { margin-bottom:0;color:#ddc18b!important; }
 #show-cards-panel { order:4; }
 @media(max-width:420px) { #card-theme-dialog { padding:18px 13px; }.theme-options { gap:8px; }.theme-option { padding:12px 5px; }.theme-sample { gap:3px; }.theme-sample .card { width:24px;height:35px;font-size:12px; }.theme-option small { font-size:9px; } }
-@media(orientation:landscape) and (max-height:600px) { #card-theme-dialog { padding:15px 20px; }.theme-options { grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:10px; }.theme-option { padding:8px; }.theme-heading h2 { font-size:18px; }.theme-option strong { margin-top:7px; }.theme-sample .card { width:23px;height:32px;font-size:11px; }.theme-sample { gap:2px; }
+@media(orientation:landscape) and (max-height:600px) { #card-theme-dialog { padding:15px 20px; }.theme-options { grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px; }.theme-option { padding:8px; }.theme-heading h2 { font-size:18px; }.theme-option strong { margin-top:7px; }.theme-sample .card { width:23px;height:32px;font-size:11px; }.theme-sample { gap:2px; }
  #show-cards-panel { padding:8px; }#show-cards-panel strong { font-size:10px; }#show-cards-panel>p:not(#show-cards-status) { display:none; }
  .show-card-actions { grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:7px; }.show-card-actions>button:last-child { grid-column:auto;font-size:10px; }
  .show-one-card { flex-direction:column;gap:3px;padding:4px 2px;font-size:9px; }.show-one-card .card { width:23px;height:31px;font-size:11px; }

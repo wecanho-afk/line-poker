@@ -18,11 +18,19 @@ test('each state update restores fold availability after a pending action',()=>{
  assert.match(html,/controls\?\.setAttribute\('aria-busy', 'true'\)/);
 });
 
-test('card themes include portrait face cards and the reaction client is loaded',()=>{
+test('card themes expose the six approved distinct designs and the reaction client is loaded',()=>{
  const html=fs.readFileSync(path.join(__dirname,'../public/index.html'),'utf8');
  const themes=fs.readFileSync(path.join(__dirname,'../public/card-themes.js'),'utf8');
+ const art=fs.readFileSync(path.join(__dirname,'../public/card-face-art.js'),'utf8');
  const css=fs.readFileSync(path.join(__dirname,'../public/card-themes.css'),'utf8');
  assert.match(html,/table-reactions\.js/);assert.match(html,/table-reactions\.css/);
- assert.match(themes,/宮廷花牌/);assert.match(themes,/賭場大字/);
- assert.match(css,/data-rank="Q"/);assert.match(css,/content:'♛'/);
+ assert.match(html,/class="card-art"/);
+ for(const name of ['經典大字','歐式宮廷','黑金賭場','四色大花','午夜幾何','酒紅雕版']) assert.match(themes,new RegExp(name));
+ assert.doesNotMatch(themes,/深海藍圖|薄荷清新/);
+ assert.equal((themes.match(/^\s*\['[^\n]+$/gm)||[]).length,6);
+ assert.match(css,/data-card-theme="four-color"[\s\S]*?background:#c62b45/);
+ for(const design of ['face-art-royal','face-art-casino','face-art-midnight','face-art-burgundy']) assert.match(art,new RegExp(design));
+ assert.match(art,/renderCardFaceArt/);assert.doesNotMatch(art,/>[JQK][<]/);
+ assert.match(css,/data-card-theme="burgundy"[\s\S]*?face-art-burgundy/);
+ assert.match(css,/data-card-theme="midnight"[\s\S]*?face-art-midnight/);
 });

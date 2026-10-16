@@ -1,14 +1,12 @@
 /* Card preferences are personal and stay on this browser. */
 (() => {
   const themes=[
-    ['classic','經典象牙','傳統紙感・典雅花色'],
-    ['royal','宮廷花牌','J／Q／K 人物徽章・華麗飾框'],
-    ['casino','賭場大字','超大點數・高對比遠距辨識'],
-    ['four-color','四色競技','黑紅藍綠・快速辨識花色'],
-    ['midnight','午夜霓虹','黑色牌面・霓虹線條'],
-    ['ocean','深海藍圖','冷白藍圖・幾何牌背'],
-    ['burgundy','酒紅典藏','復古奶油・酒紅雕花'],
-    ['mint','薄荷清新','清亮底色・柔和墨綠']
+    ['classic','經典大字','左上點數・中央大花色'],
+    ['royal','歐式宮廷','彩色宮廷徽章・象牙金框'],
+    ['casino','黑金賭場','籌碼星芒皇冠・霧黑金框'],
+    ['four-color','四色大花','四色牌底・白色字與花色'],
+    ['midnight','午夜幾何','三種幾何花牌・霓虹線條'],
+    ['burgundy','酒紅雕版','馬頭玫瑰雄獅・米金蝕刻']
   ];
   const button=document.createElement('button');button.id='card-theme-toggle';button.type='button';button.textContent='♠ 牌面';button.setAttribute('aria-haspopup','dialog');
   document.getElementById('voice-toggle').before(button);
@@ -27,7 +25,7 @@
   }
   for(const [id,name,detail] of themes){
     const choice=document.createElement('button');choice.type='button';choice.className='theme-option';choice.dataset.cardTheme=id;
-    choice.innerHTML='<div class="theme-sample" aria-hidden="true">'+['As','Kh','Qd','Jc'].map(c=>formatCard(c)).join('')+'<div class="card card-back">W</div></div><strong>'+name+'</strong><small>'+detail+'</small>';
+    choice.innerHTML='<div class="theme-sample" aria-hidden="true">'+['As','Jc','Qd','Kh'].map(c=>formatCard(c)).join('')+'<div class="card card-back">W</div></div><strong>'+name+'</strong><small>'+detail+'</small>';
     choice.onclick=()=>select(id);options.append(choice);
   }
   select(selected);button.onclick=()=>dialog.showModal();dialog.querySelector('.theme-close').onclick=()=>dialog.close();
