@@ -27,7 +27,7 @@
       const table=document.getElementById('poker-table');void table.offsetWidth;table.classList.add('allin-impact');
       hideTimer=setTimeout(clearEffect,2600);
     }}
-    document.querySelectorAll('.player-seat').forEach((seat,i)=>seat.classList.toggle('allin-seat',!!state.players[i]?.all_in));
+    document.querySelectorAll('.player-seat').forEach(seat=>seat.classList.toggle('allin-seat',!!state.players.find(p=>p.user_id===seat.dataset.playerId)?.all_in));
     document.body.classList.toggle('allin-hand',tense&&proView==='table');
     const bet=state.current_bet_amount===0;
     const raise=document.querySelector('button[onclick="performAction(\'raise\')"]');raise.textContent=bet?'下注 Bet':'加注 Raise';

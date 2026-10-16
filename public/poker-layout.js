@@ -2,6 +2,8 @@
 (() => {
   const byId = id => document.getElementById(id);
   const game = byId('game-view');
+  const brand = document.querySelector('.header h1');
+  brand.innerHTML = '<span class="club-monogram" aria-hidden="true">W</span><span class="club-wordmark">W POKER<small>私人撲克俱樂部</small></span>';
   if (/^(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)$/.test(location.hostname)) {
     const badge=document.createElement('span');badge.className='preview-badge';badge.textContent='測試版';document.querySelector('.header h1').append(badge);
   }
@@ -13,11 +15,15 @@
   const timeCard=document.createElement('button');timeCard.id='time-card-btn';timeCard.type='button';timeCard.className='btn-blue';timeCard.hidden=true;
   const runoutChoice=document.createElement('section');runoutChoice.id='runout-choice-panel';runoutChoice.hidden=true;runoutChoice.setAttribute('aria-live','polite');
   const board = document.createElement('div'); board.className = 'board-center';
+  const tableSignature=document.createElement('div');tableSignature.className='table-signature';tableSignature.setAttribute('aria-hidden','true');tableSignature.innerHTML='<span>W</span>NO LIMIT HOLD’EM';
+  board.append(tableSignature);
   board.append(document.querySelector('.pot-area'),byId('community-cards'));
   byId('poker-table').prepend(board);
   stage.append(room,byId('table-meta'),byId('poker-table'));
   rail.append(state,byId('turn-timer-display'),timeCard,runoutChoice,byId('tournament-info-display'),byId('practice-context'),byId('game-controls'),byId('repeat-practice'),tools,byId('lobby-return'));
   game.append(stage,rail);
+  const railHeading=document.createElement('div');railHeading.className='rail-heading';railHeading.innerHTML='<span>牌局控制台</span><span class="rail-indicator" aria-hidden="true"></span>';rail.prepend(railHeading);
+  const progress=document.createElement('div');progress.className='turn-progress';progress.setAttribute('aria-hidden','true');progress.innerHTML='<i></i>';byId('turn-timer-display').after(progress);
   byId('game-controls').children[0].className='primary-actions';
   byId('game-controls').children[1].className='quick-actions';
   byId('game-controls').children[2].className='raise-actions';
@@ -48,16 +54,6 @@
     try{const result=await api('/runout_choice','POST',{game_id:gameId,user_id:userId,runs,expected_action_count:proState?.action_count});if(result.game_state)updateUI(result.game_state);if(!result.success)alert(result.message||'選擇未送出');}
     catch{alert('連線中斷，請重新確認發牌次數');}finally{featureBusy=false;if(proState)renderTableFeatures(proState);}
   }
-  function renderRunoutBoards(state){
-    const area=byId('community-cards'),boards=state.runout_boards;
-    area.classList.toggle('run-twice',Array.isArray(boards)&&boards.length===2);
-    if(!Array.isArray(boards)||boards.length!==2)return;
-    const shared=Math.max(0,Math.min(5,Number(state.runout_shared_count)||0));
-    const common=shared?`<div class="runout-common"><span>共同牌</span>${boards[0].slice(0,shared).map(c=>formatCard(c)).join('')}</div>`:'';
-    const lanes=boards.map((cards,index)=>`<div class="runout-lane"><b>${index+1}</b>${Array.from({length:5-shared},(_,offset)=>cards[shared+offset]?formatCard(cards[shared+offset]):'<div class="card-empty"></div>').join('')}</div>`).join('');
-    area.innerHTML=common+`<div class="runout-branches">${lanes}</div>`;
-    area.setAttribute('aria-label','公共牌發兩次');
-  }
   function renderTableFeatures(state){
     const me=state.players.find(p=>p.user_id===userId),cards=me?.time_cards||0,remaining=50-((me?.hands_played||0)%50);
     timeCard.hidden=!gameId;timeCard.textContent=cards?`⏱ 30秒時間卡 ×${cards}`:`⏱ 再 ${remaining} 手獲得時間卡`;
@@ -71,7 +67,6 @@
       runoutChoice.innerHTML=`<strong>${escapeHTML(title)}</strong><p>${escapeHTML(detail)}</p>${mine?'<div><button type="button" data-runs="1">發 1 次</button><button type="button" data-runs="2">發 2 次</button></div>':''}`;
       runoutChoice.querySelectorAll('[data-runs]').forEach(button=>button.onclick=()=>chooseRunout(Number(button.dataset.runs)));
     }
-    renderRunoutBoards(state);
   }
   async function showSelectedCards(indexes, handNumber) {
     if(revealBusy)return;
@@ -97,6 +92,8 @@
     const shown=me.shown_card_indexes||[];
     const actions=reveal.querySelector('.show-card-actions');actions.replaceChildren();
     const handNumber=state.hand_number;
+    const nextLabel=state.hand_limit&&state.hand_number>=state.hand_limit?'結算':'自動下一手';
+    reveal.querySelector('strong').textContent=state.next_hand_remaining_ms>0?`秀牌時間 · ${Math.ceil(state.next_hand_remaining_ms/1000)} 秒後${nextLabel}`:'本手結束 · 秀牌';
     me.hand.forEach((card,index)=>{
       const button=document.createElement('button');button.className='show-one-card';
       button.innerHTML=formatCard(card)+'<span>'+ (shown.includes(index)?'已公開':'秀這張')+'</span>';
@@ -114,7 +111,15 @@
     const active=['pre_flop','flop','turn','river'].includes(state.game_state);
     const mine=state.current_player_id===userId && active;
     byId('action-status').textContent=state.runout_choice?(state.runout_choice.actor_id===userId?'請選擇發牌次數':'等待發牌次數決定'):mine?'輪到你了':active?'等待對手行動':streetLabels[state.game_state]||'準備入座';
+    if(state.next_hand_remaining_ms>0)byId('action-status').textContent=`秀牌中 · ${Math.ceil(state.next_hand_remaining_ms/1000)} 秒後${state.hand_limit&&state.hand_number>=state.hand_limit?'結算':'繼續'}`;
     rail.classList.toggle('your-turn',mine);
+    rail.classList.toggle('decision-turn',state.runout_choice?.actor_id===userId);
+    document.querySelectorAll('.poker-table .player-seat').forEach(seat=>{
+      const player=state.players.find(p=>p.user_id===seat.dataset.playerId);
+      seat.classList.toggle('is-self',player?.user_id===userId);
+      seat.classList.toggle('is-folded',!!player?.folded);
+      seat.classList.toggle('is-winner',state.game_state==='showdown'&&!!state.winners?.includes(player?.user_id));
+    });
   };
 })();
 

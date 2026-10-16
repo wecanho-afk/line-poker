@@ -197,7 +197,11 @@
     </style>
 <link rel="stylesheet" href="/poker-pro.css">
 <link rel="stylesheet" href="/poker-layout.css">
+<link rel="stylesheet" href="/poker-premium.css">
+<link rel="stylesheet" href="/poker-board.css">
+<link rel="stylesheet" href="/card-themes.css">
 <script src="/turn-clock.js"></script>
+<script src="/board-renderer.js"></script>
 </head>
 <body>
     <div class="header">
@@ -584,6 +588,12 @@
             if (!timerEl) return;
             const render = () => {
                 const remaining = turnClock.remaining();
+                const progress = document.querySelector('.turn-progress');
+                if (progress) {
+                    progress.hidden = remaining <= 0;
+                    progress.classList.toggle('urgent', remaining < 6000);
+                    progress.firstElementChild.style.setProperty('--turn-progress', Math.min(100, remaining / Math.max(20000, state.turn_remaining_ms || 0) * 100) + '%');
+                }
                 const thinkingId = state.runout_choice?.actor_id || state.current_player_id;
                 const label = thinkingId === userId ? '你的思考時間' : '對手思考時間';
                 timerEl.textContent = remaining > 0 ? `⏳ ${label}: ${(remaining/1000).toFixed(1)}s` : '⏳ 時間已到，等待伺服器更新…';
@@ -916,16 +926,16 @@
         let knownPlayerCards = {};
 
         function formatCard(cardStr, isNew = false) {
-            if (cardStr === '??') return `<div class="card ${isNew ? 'animate-deal' : ''}" style="background:#555; color:white;">?</div>`;
+            if (cardStr === '??') return `<div class="card card-back ${isNew ? 'animate-deal' : ''}" aria-label="未公開的底牌"><span aria-hidden="true">W</span></div>`;
             const rank = cardStr[0] === 'T' ? '10' : cardStr[0];
             const suit = cardStr[1];
             const isRed = suit === 'h' || suit === 'd';
             let suitIcon = suit;
-            if(suit==='s') suitIcon='♠️';
-            if(suit==='h') suitIcon='♥️';
-            if(suit==='d') suitIcon='♦️';
-            if(suit==='c') suitIcon='♣️';
-            return `<div class="card ${isRed ? 'red' : ''} ${isNew ? 'animate-deal' : ''}">
+            if(suit==='s') suitIcon='♠\uFE0E';
+            if(suit==='h') suitIcon='♥\uFE0E';
+            if(suit==='d') suitIcon='♦\uFE0E';
+            if(suit==='c') suitIcon='♣\uFE0E';
+            return `<div class="card ${isRed ? 'red' : ''} ${isNew ? 'animate-deal' : ''}" data-suit="${suit}">
                         <span style="font-size:0.8em; align-self:flex-start; margin-left:2px;">${rank}</span>
                         <span style="font-size:1.5em;">${suitIcon}</span>
                     </div>`;
@@ -964,7 +974,6 @@
 
             // 更新公共牌
             const communityDiv = document.getElementById('community-cards');
-            communityDiv.innerHTML = '';
             
             const handKey = state.game_id + ":" + state.hand_number;
             if (knownHandKey !== handKey) {
@@ -973,15 +982,8 @@
                 knownPlayerCards = {};
             }
 
-            if (state.community_cards.length > 0) {
-                state.community_cards.forEach((c, idx) => {
-                    const isNew = idx >= knownCommunityCards.length;
-                    communityDiv.innerHTML += formatCard(c, isNew);
-                });
-                knownCommunityCards = state.community_cards.slice();
-            } else {
-                for(let i=0; i<5; i++) communityDiv.innerHTML += '<div class="card-empty"></div>';
-            }
+            PokerBoardRenderer.render(communityDiv, state, formatCard);
+            knownCommunityCards = state.community_cards.slice();
             
             // 更新底池
             document.getElementById('pot-display').textContent = `$${state.pot}`;
@@ -1014,6 +1016,7 @@
                 
                 const div = document.createElement('div');
                 div.className = `player-seat seat-${seatNum} ${p.is_current_player ? 'active' : ''}`;
+                div.dataset.playerId = p.user_id;
                 // Elevate z-index if this player has cards to show during showdown, or is active
                 if (p.is_current_player || (state.game_state === 'showdown' && !p.folded)) {
                     div.style.zIndex = 30;
@@ -1118,6 +1121,8 @@
                 turnClock.accept(state);
                 if (timerInterval) clearInterval(timerInterval);
                 document.getElementById('turn-timer-display').textContent = '';
+                const progress = document.querySelector('.turn-progress');
+                if (progress) progress.hidden = true;
             }
 
             if (state.game_state === 'game_over' && state.cash_settlement) {
@@ -1180,6 +1185,6 @@
 <script src="/music-playlist.js"></script>
 <script src="/music-player.js"></script>
 <script src="/poker-atmosphere.js"></script>
+<script src="/card-themes.js"></script>
 </body>
 </html>
-

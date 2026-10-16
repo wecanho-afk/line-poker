@@ -556,8 +556,8 @@ class TexasHoldemGame {
         this.gameState = 'showdown';
         history.finish(this);
         
+        this.scheduleAction('next', 2000);
         broadcastState(this.gameId);
-        this.scheduleAction('next', 4000);
     }
 
     estimateRunoutEquities(contenders) {
@@ -857,7 +857,10 @@ class TexasHoldemGame {
         if (!pending || pending.due > now) return;
         this.cancelScheduledAction();
         if (pending.hand !== this.handNumber || pending.street !== this.gameState) return;
-        if (pending.kind === 'next') this.prepareNext();
+        if (pending.kind === 'next') {
+            this.prepareNext();
+            if (this.gameState === 'waiting_for_next_round' && !this.practice) this.startNewRound();
+        }
         else if (pending.kind === 'runout') this.advanceRunout();
         else if (pending.kind === 'runout_choice') {
             const runs=this.runoutDecision?.stage==='decision'?(this.runoutDecision.proposedRuns||1):(this.players[pending.playerId]?.isBot?2:1);
@@ -1098,8 +1101,8 @@ class TexasHoldemGame {
         this.actionCount++;
         this.latestVoice = 'winner';
         
+        this.scheduleAction('next', 2000);
         broadcastState(this.gameId);
-        this.scheduleAction('next', 6000);
     }
 
     prepareNext() {
@@ -1154,6 +1157,7 @@ class TexasHoldemGame {
     }
 
     canShowCards(player) {
+        if (this.scheduledAction?.kind === 'next' && this.scheduledAction.due <= Date.now()) return false;
         return !!player && !player.leftTable && !player.isBot && player.hand.length === 2 &&
             !!this.currentHand?.finished && ['showdown','waiting_for_next_round','game_over'].includes(this.gameState);
     }
@@ -1186,6 +1190,7 @@ class TexasHoldemGame {
         return {
             snapshot_version: this.snapshotVersion,
             viewer_id: userId,
+            next_hand_remaining_ms: this.scheduledAction?.kind === 'next' && !this.practice ? Math.max(0, this.scheduledAction.due - serverTime) : 0,
             host_user_id: this.getHostId(),
             hand_number: this.handNumber || 0,
             blinds: this.blinds,
@@ -1528,5 +1533,4 @@ if (!process.env.NO_SERVER) {
 }
 
 module.exports = { app, TexasHoldemGame, Card, Deck, GAMES, broadcastState, server, io, verifyLineUser };
-
 
