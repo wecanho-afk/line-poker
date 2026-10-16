@@ -6,6 +6,7 @@ test('pot shortcuts submit immediately without focusing the numeric keyboard',()
  const html=fs.readFileSync(path.join(__dirname,'../public/index.html'),'utf8');
  const quick=html.match(/async function setQuickBet[\s\S]*?\n        }/)?.[0]||'';
  assert.match(quick,/await performAction\('raise', amount\)/);
+ assert.match(quick,/fraction === 'allin'.*performAction\('call'\)/);
  assert.match(quick,/\.blur\(\)/);
  assert.doesNotMatch(quick,/\.focus\(\)/);
 });

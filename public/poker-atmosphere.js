@@ -28,7 +28,7 @@
       const cards=document.querySelector('.poker-table .seat-0 .player-cards');
       if(cards){cards.classList.add('premium-edge-flash');setTimeout(()=>cards.classList.remove('premium-edge-flash'),2200);}
     }
-    const strengthEvent=analysis&&analysis.tier!=='normal'?`${key}:${state.community_cards.length}:${analysis.tier}:${analysis.label}`:'';
+    const strengthEvent=analysis&&analysis.tier!=='normal'?`${key}:${analysis.tier}:${analysis.label}`:'';
     if(strengthEvent&&strengthEvent!==lastStrengthEvent&&proView==='table'){lastStrengthEvent=strengthEvent;celebrate(analysis);}
     const newcomers=state.players.filter(p=>p.all_in&&!seen.has(p.user_id));
     for(const p of newcomers)seen.add(p.user_id);

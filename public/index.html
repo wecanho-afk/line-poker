@@ -904,6 +904,7 @@
             const input = document.getElementById('raiseAmount');
             input.value = amount;
             input.blur();
+            if (fraction === 'allin' && amount <= currentBet) return performAction('call');
             await performAction('raise', amount);
         }
 
