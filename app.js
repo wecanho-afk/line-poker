@@ -10,6 +10,8 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
+const TABLE_STICKERS = new Set(['nice','wow','gg','laugh','cheer','thanks','coffee','fish']);
+const STICKER_COOLDOWN_MS = 1500;
 const LINE_CHANNEL_ID = process.env.LINE_CHANNEL_ID || '2010219463';
 
 async function verifyLineUser(accessToken, expectedUserId, fetchImpl = fetch) {
@@ -1517,6 +1519,23 @@ io.on('connection', socket => {
     });
     socket.on('voice_signal', data => {
         socket.to(data.target).emit('voice_signal', { ...data, from: socket.id });
+    });
+    socket.on('table_sticker', (data, acknowledge) => {
+        const reply = typeof acknowledge === 'function' ? acknowledge : () => {};
+        const game = GAMES[socket.gameId];
+        const player = game?.players[socket.userId];
+        if (!game || !player || player.leftTable || (player.historyKey && player.historyKey !== socket.historyKey)) {
+            return reply({ success:false, message:'尚未加入牌桌' });
+        }
+        const stickerId = typeof data?.id === 'string' ? data.id : '';
+        if (!TABLE_STICKERS.has(stickerId)) return reply({ success:false, message:'無效貼圖' });
+        const now = Date.now();
+        if (now - (socket.lastStickerAt || 0) < STICKER_COOLDOWN_MS) {
+            return reply({ success:false, message:'貼圖冷卻中' });
+        }
+        socket.lastStickerAt = now;
+        io.to(socket.gameId).emit('table_sticker', { id:stickerId, user_id:socket.userId, at:now });
+        reply({ success:true });
     });
     socket.on('disconnect', () => {
         if (socket.gameId && socket.userId && GAMES[socket.gameId]) {

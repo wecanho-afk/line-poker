@@ -1,4 +1,4 @@
-const {test}=require('node:test');const assert=require('node:assert/strict');const {describe,isPremiumStartingHand}=require('../public/hand-strength');
+const {test}=require('node:test');const assert=require('node:assert/strict');const {describe,analyze,isPremiumStartingHand}=require('../public/hand-strength');
 test('premium starting hands include JJ+ AK and suited AQ only',()=>{
  for(const hand of [['Js','Jh'],['Qs','Qd'],['Kh','Kc'],['As','Ad'],['As','Kh'],['Ah','Kd'],['As','Qs']])assert.equal(isPremiumStartingHand(hand),true,hand.join(' '));
  for(const hand of [['Ts','Th'],['As','Qh'],['Ks','Qs'],['9s','9h'],['??','??'],['As','As']])assert.equal(isPremiumStartingHand(hand),false,hand.join(' '));
@@ -22,6 +22,13 @@ test('personal strength identifies ranks, wheel, pairs, full houses and best fiv
 });
 test('unknown, absent, duplicated or invalid cards never produce a private hint',()=>{
  for(const [h,b]of [[['??','??'],[]],[[],[]],[['As','As'],[]],[['As','Kd'],['As']],[['Xx','Kh'],[]]])assert.equal(describe(h,b),null);
+});
+test('good hands are classified for visible client celebration effects',()=>{
+ assert.deepEqual(analyze(['As','Ah'],[]),{label:'A 一對',tier:'premium',headline:'PREMIUM HAND'});
+ assert.equal(analyze(['As','Kd'],['Ac','Kh','2s']).tier,'made');
+ assert.equal(analyze(['As','Ad'],['Ac','7h','2s']).tier,'strong');
+ assert.equal(analyze(['As','Ad'],['Ac','Ah','2s']).tier,'monster');
+ assert.equal(analyze(['As','Kd'],['2c','7h','9s']).tier,'normal');
 });
 test('500 seeded seven-card hands agree with an independent poker evaluator category',()=>{
  const {Hand}=require('pokersolver');const deck=[...'23456789TJQKA'].flatMap(r=>[...'shdc'].map(s=>r+s));let seed=781;

@@ -1,7 +1,9 @@
 /* Theme-scoped variables also let the picker preview every design. */
 [data-card-theme] { --card-paper:linear-gradient(135deg,#fffdf7,#eae7dc);--card-ink:#1d302a;--card-red:#b84147;--card-edge:#f8f2e5;--card-back:repeating-linear-gradient(45deg,#263b48 0 2px,#1b2d38 2px 5px);--card-back-ink:#d9c38c;--card-diamond:var(--card-red);--card-club:var(--card-ink); }
 [data-card-theme="four-color"] { --card-paper:linear-gradient(135deg,#ffffff,#eaf0f2);--card-ink:#202e38;--card-red:#ce3044;--card-edge:#fff;--card-back:repeating-linear-gradient(45deg,#203e48 0 2px,#325869 2px 5px);--card-diamond:#276ed0;--card-club:#148257; }
-[data-card-theme="midnight"] { --card-paper:linear-gradient(140deg,#293131,#10191b);--card-ink:#f1d299;--card-red:#f49a9e;--card-edge:#9f8b62;--card-back:repeating-linear-gradient(45deg,#252c29 0 2px,#363b2f 2px 5px); }
+[data-card-theme="royal"] { --card-paper:radial-gradient(circle at 50% 53%,#f8e8bd 0 18%,transparent 19%),linear-gradient(135deg,#fffdf2,#e8d3a7);--card-ink:#243c5d;--card-red:#a72c42;--card-edge:#c39b4a;--card-back:repeating-conic-gradient(from 45deg,#7c1731 0 25%,#a99760 0 50%) 0/10px 10px;--card-back-ink:#fff0bd; }
+[data-card-theme="casino"] { --card-paper:#fff;--card-ink:#101418;--card-red:#df1835;--card-edge:#fff;--card-back:radial-gradient(circle,#fff 0 1px,transparent 2px) 0 0/7px 7px,#d51335;--card-back-ink:#fff; }
+[data-card-theme="midnight"] { --card-paper:linear-gradient(145deg,#17202a,#05080d);--card-ink:#63e7ff;--card-red:#ff5f93;--card-edge:#567f8a;--card-back:linear-gradient(135deg,#9f4bff22 25%,transparent 25%) 0 0/8px 8px,linear-gradient(315deg,#36e5ff22 25%,transparent 25%) 0 0/8px 8px,#0a101b;--card-back-ink:#74eaff;--card-diamond:#a98aff;--card-club:#5de1b4; }
 [data-card-theme="ocean"] { --card-paper:linear-gradient(135deg,#fcffff,#d9e9f3);--card-ink:#153d68;--card-red:#b43d66;--card-edge:#c7deed;--card-back:repeating-linear-gradient(45deg,#20466e 0 2px,#13314f 2px 5px);--card-back-ink:#d1eafa; }
 [data-card-theme="burgundy"] { --card-paper:linear-gradient(135deg,#fff7e9,#eadbc9);--card-ink:#3b2e2d;--card-red:#923e4e;--card-edge:#f0d7bd;--card-back:repeating-linear-gradient(45deg,#67303d 0 2px,#442432 2px 5px); }
 [data-card-theme="mint"] { --card-paper:linear-gradient(135deg,#f4fff8,#d7eddd);--card-ink:#165748;--card-red:#b44e61;--card-edge:#c3e0c9;--card-back:repeating-linear-gradient(45deg,#286754 0 2px,#194c40 2px 5px);--card-back-ink:#cef1de; }
@@ -13,6 +15,18 @@ body[data-card-theme] .card-back,.theme-option .card-back { background:var(--car
 body[data-card-theme] #community-cards .board-dealing::after { background:var(--card-back);color:var(--card-back-ink);border-color:var(--card-edge); }
 body[data-card-theme] .card::after,.theme-option .card::after { background:var(--card-back); }
 .theme-option .card::after { display:none; }
+body[data-card-theme] .card[data-rank="J"],body[data-card-theme] .card[data-rank="Q"],body[data-card-theme] .card[data-rank="K"],.theme-option .card[data-rank="J"],.theme-option .card[data-rank="Q"],.theme-option .card[data-rank="K"] { overflow:hidden;isolation:isolate; }
+body[data-card-theme] .card[data-rank="J"]::before,.theme-option .card[data-rank="J"]::before { content:'⚔'; }
+body[data-card-theme] .card[data-rank="Q"]::before,.theme-option .card[data-rank="Q"]::before { content:'♛'; }
+body[data-card-theme] .card[data-rank="K"]::before,.theme-option .card[data-rank="K"]::before { content:'♚'; }
+body[data-card-theme] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"])::before,.theme-option .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"])::before { position:absolute;inset:20% 10% 10%;display:grid;place-items:center;border:1px solid currentColor;border-radius:40% 40% 12% 12%;font-family:Georgia,serif;font-size:1.2em;line-height:1;opacity:.2;z-index:-1; }
+body[data-card-theme="royal"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"])::before,.theme-option[data-card-theme="royal"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"])::before { inset:18% 8% 8%;opacity:.88;border:2px double #ad8439;background:repeating-linear-gradient(45deg,#b78b3620 0 2px,transparent 2px 5px);box-shadow:inset 0 0 0 2px #fff7d055;font-size:1.35em; }
+body[data-card-theme="royal"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) span:last-child,.theme-option[data-card-theme="royal"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) span:last-child { position:absolute;right:7%;bottom:3%;font-size:.65em!important; }
+body[data-card-theme="casino"] .card span:first-child,.theme-option[data-card-theme="casino"] .card span:first-child { position:absolute;inset:5% auto auto 8%;font:800 1.45em/1 Arial,sans-serif!important;letter-spacing:-.08em; }
+body[data-card-theme="casino"] .card span:last-child,.theme-option[data-card-theme="casino"] .card span:last-child { font-size:1.8em!important; }
+body[data-card-theme="casino"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"])::before,.theme-option[data-card-theme="casino"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"])::before { opacity:.12;border:0;font-size:2em; }
+body[data-card-theme="midnight"] .card,.theme-option[data-card-theme="midnight"] .card { box-shadow:inset 0 0 12px color-mix(in srgb,currentColor 18%,transparent),0 0 8px color-mix(in srgb,currentColor 18%,transparent);text-shadow:0 0 7px currentColor; }
+body[data-card-theme="burgundy"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"])::before,.theme-option[data-card-theme="burgundy"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"])::before { opacity:.45;border-style:double;background:radial-gradient(circle,#a56d5122,transparent 65%); }
 .header #card-theme-toggle { white-space:nowrap; }
 #card-theme-dialog { width:min(650px,94vw);padding:25px;max-height:90dvh;overflow:auto;background:linear-gradient(145deg,#1b3029,#0c1d1a);color:#efe4cf;border:1px solid #c7aa6e66;border-radius:18px; }
 #card-theme-dialog::backdrop { background:#030b0cba;backdrop-filter:blur(6px); }
@@ -27,7 +41,7 @@ body[data-card-theme] .card::after,.theme-option .card::after { background:var(-
 .theme-selection { margin-bottom:0;color:#ddc18b!important; }
 #show-cards-panel { order:4; }
 @media(max-width:420px) { #card-theme-dialog { padding:18px 13px; }.theme-options { gap:8px; }.theme-option { padding:12px 5px; }.theme-sample { gap:3px; }.theme-sample .card { width:24px;height:35px;font-size:12px; }.theme-option small { font-size:9px; } }
-@media(orientation:landscape) and (max-height:600px) { #card-theme-dialog { padding:15px 20px; }.theme-options { grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:10px; }.theme-option { padding:9px; }.theme-heading h2 { font-size:18px; }.theme-option strong { margin-top:7px; }.theme-sample .card { width:25px;height:34px;font-size:12px; }.theme-sample { gap:3px; }
+@media(orientation:landscape) and (max-height:600px) { #card-theme-dialog { padding:15px 20px; }.theme-options { grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:10px; }.theme-option { padding:8px; }.theme-heading h2 { font-size:18px; }.theme-option strong { margin-top:7px; }.theme-sample .card { width:23px;height:32px;font-size:11px; }.theme-sample { gap:2px; }
  #show-cards-panel { padding:8px; }#show-cards-panel strong { font-size:10px; }#show-cards-panel>p:not(#show-cards-status) { display:none; }
  .show-card-actions { grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:7px; }.show-card-actions>button:last-child { grid-column:auto;font-size:10px; }
  .show-one-card { flex-direction:column;gap:3px;padding:4px 2px;font-size:9px; }.show-one-card .card { width:23px;height:31px;font-size:11px; }

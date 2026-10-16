@@ -29,6 +29,17 @@
   function choose(from,picked){if(picked.length===5){const value=score(picked);if(!best||better(value.key,best.key))best=value;return;}for(let i=from;i<=cards.length-(5-picked.length);i++)choose(i+1,[...picked,cards[i]]);}
   choose(0,[]);return best.label;
  }
+ function analyze(hole,board=[]){
+  if(!Array.isArray(hole)||hole.length!==2||!Array.isArray(board)||board.length>5)return null;
+  const cards=[...hole,...board];if(cards.some(c=>typeof c!=='string'||!/^[2-9TJQKA][shdc]$/.test(c))||new Set(cards).size!==cards.length)return null;
+  if(board.length===0&&isPremiumStartingHand(hole))return {label:describe(hole,board),tier:'premium',headline:'PREMIUM HAND'};
+  if(cards.length<5)return {label:describe(hole,board),tier:'normal',headline:''};
+  let best=null;
+  function choose(from,picked){if(picked.length===5){const value=score(picked);if(!best||better(value.key,best.key))best=value;return;}for(let i=from;i<=cards.length-(5-picked.length);i++)choose(i+1,[...picked,cards[i]]);}
+  choose(0,[]);
+  const tier=best.key[0]>=6?'monster':best.key[0]>=3?'strong':best.key[0]===2?'made':'normal';
+  return {label:best.label,tier,headline:tier==='monster'?'MONSTER HAND':tier==='strong'?'BIG HAND':tier==='made'?'MADE HAND':''};
+ }
  function isPremiumStartingHand(hole){
   if(!Array.isArray(hole)||hole.length!==2||hole.some(c=>typeof c!=='string'||!/^[2-9TJQKA][shdc]$/.test(c))||hole[0]===hole[1])return false;
   const ranks=hole.map(c=>c[0]),suited=hole[0][1]===hole[1][1];
@@ -36,5 +47,5 @@
   const key=ranks.sort((a,b)=>'23456789TJQKA'.indexOf(b)-'23456789TJQKA'.indexOf(a)).join('');
   return key==='AK'||(key==='AQ'&&suited);
  }
- return {describe,isPremiumStartingHand};
+ return {describe,analyze,isPremiumStartingHand};
 });

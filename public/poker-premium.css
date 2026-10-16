@@ -125,6 +125,18 @@ body.playing .community-cards-area .card,body.playing .community-cards-area .car
 .turn-progress.urgent i { background:#ed937d; }
 #my-hand-strength { background:#071a1555;border:1px solid #9fb49222;border-radius:10px;padding:12px; }
 #my-hand-strength span { font-size:9px;letter-spacing:.04em;color:#879f90; }#my-hand-strength strong { font-size:17px;color:#e7d5ab;margin:5px 0; }#my-hand-strength small { color:#718d7b;font-size:9px; }
+#my-hand-strength[data-tier="made"],#my-hand-strength[data-tier="strong"],#my-hand-strength[data-tier="monster"],#my-hand-strength[data-tier="premium"] { border-color:#ddb96a88;background:linear-gradient(135deg,#58471c38,#10261e);box-shadow:inset 0 0 22px #e9b84712,0 0 15px #e9b84710; }
+#my-hand-strength[data-tier="monster"] strong,#my-hand-strength[data-tier="premium"] strong { color:#ffe3a0;text-shadow:0 0 12px #ffcb5e80; }
+#hand-celebration { position:absolute;z-index:50;left:50%;top:49%;transform:translate(-50%,-50%);min-width:210px;padding:18px 30px;text-align:center;pointer-events:none;overflow:visible;border:1px solid #ffe29a;background:radial-gradient(circle,#233f31f5,#081b17ed 72%);border-radius:16px;box-shadow:0 0 0 5px #ffd56f18,0 0 44px #ffc94d70,inset 0 0 28px #f6c65424;animation:hand-celebration-in 2.6s ease-out both; }
+#hand-celebration>span { display:block;color:#e2bd6e;font-size:9px;letter-spacing:.3em;margin-bottom:6px; }
+#hand-celebration>strong { display:block;color:#fff0bd;font:600 25px/1.2 Georgia,'Microsoft JhengHei',serif;text-shadow:0 2px 12px #e2ac4f; }
+#hand-celebration>i { position:absolute;left:50%;top:50%;width:7px;height:7px;border-radius:50%;background:#ffe9a6;box-shadow:0 0 9px #ffd05f;animation:hand-spark 1.35s ease-out infinite; }
+#hand-celebration>i:nth-of-type(2) { animation-delay:.12s;--spark-x:92px;--spark-y:-48px; }#hand-celebration>i:nth-of-type(3) { animation-delay:.24s;--spark-x:75px;--spark-y:59px; }#hand-celebration>i:nth-of-type(4) { animation-delay:.36s;--spark-x:-86px;--spark-y:49px; }#hand-celebration>i:nth-of-type(5) { animation-delay:.48s;--spark-x:-93px;--spark-y:-39px; }#hand-celebration>i:nth-of-type(6) { animation-delay:.6s;--spark-x:5px;--spark-y:-70px; }
+#hand-celebration[data-tier="monster"] { border-color:#fff4bd;box-shadow:0 0 0 7px #ffd56f24,0 0 70px #ffbd36a6,inset 0 0 35px #ffe29a2c; }
+body.playing .poker-table.hand-hit-effect { animation:hand-table-glow 1.7s ease-out; }
+@keyframes hand-celebration-in { 0% { opacity:0;transform:translate(-50%,-50%) scale(.68);filter:brightness(1.7); } 14%,70% { opacity:1;transform:translate(-50%,-50%) scale(1); } 100% { opacity:0;transform:translate(-50%,-54%) scale(1.03); } }
+@keyframes hand-spark { 0% { opacity:0;transform:translate(0,0) scale(.2); } 25% { opacity:1; } 100% { opacity:0;transform:translate(var(--spark-x,65px),var(--spark-y,-55px)) scale(1.1); } }
+@keyframes hand-table-glow { 0%,100% { filter:none; } 18% { filter:brightness(1.18) saturate(1.18); } 40% { filter:brightness(1.05); } }
 #time-card-btn { background:#ffffff04;color:#b8cbbb;border-color:#ffffff12;font-size:11px;min-height:34px; }
 #time-card-btn:disabled { opacity:.6;background:transparent;color:#879a8f; }
 .controls { gap:9px!important; }.controls button { min-height:46px;font-size:13px;border-radius:8px; }

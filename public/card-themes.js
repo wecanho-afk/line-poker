@@ -1,6 +1,15 @@
 /* Card preferences are personal and stay on this browser. */
 (() => {
-  const themes=[['classic','經典象牙','溫潤紙感・雙色花色'],['four-color','四色競技','四色辨識・清楚易讀'],['midnight','午夜黑金','深色牌面・霧金細節'],['ocean','深海藍','冷白牌面・海藍牌背'],['burgundy','酒紅典藏','奶油牌面・酒紅牌背'],['mint','薄荷清新','清亮底色・墨綠花色']];
+  const themes=[
+    ['classic','經典象牙','傳統紙感・典雅花色'],
+    ['royal','宮廷花牌','J／Q／K 人物徽章・華麗飾框'],
+    ['casino','賭場大字','超大點數・高對比遠距辨識'],
+    ['four-color','四色競技','黑紅藍綠・快速辨識花色'],
+    ['midnight','午夜霓虹','黑色牌面・霓虹線條'],
+    ['ocean','深海藍圖','冷白藍圖・幾何牌背'],
+    ['burgundy','酒紅典藏','復古奶油・酒紅雕花'],
+    ['mint','薄荷清新','清亮底色・柔和墨綠']
+  ];
   const button=document.createElement('button');button.id='card-theme-toggle';button.type='button';button.textContent='♠ 牌面';button.setAttribute('aria-haspopup','dialog');
   document.getElementById('voice-toggle').before(button);
   const dialog=document.createElement('dialog');dialog.id='card-theme-dialog';dialog.setAttribute('aria-labelledby','card-theme-title');

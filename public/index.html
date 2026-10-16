@@ -200,6 +200,7 @@
 <link rel="stylesheet" href="/poker-premium.css">
 <link rel="stylesheet" href="/poker-board.css">
 <link rel="stylesheet" href="/card-themes.css">
+<link rel="stylesheet" href="/table-reactions.css">
 <script src="/turn-clock.js"></script>
 <script src="/board-renderer.js"></script>
 </head>
@@ -882,7 +883,7 @@
         }
 
         
-        function setQuickBet(fraction) {
+        async function setQuickBet(fraction) {
             let pot = window.currentPot || 0;
             let currentBet = window.currentBetAmount || 0;
             let myChips = window.myChips || 0;
@@ -900,25 +901,41 @@
             if (amount < minRaise && fraction !== 'allin') amount = minRaise;
             if (amount > myChips + myCurrentBet) amount = myChips + myCurrentBet;
             
-            document.getElementById('raiseAmount').value = amount;
-            document.getElementById('raiseAmount').focus();
+            const input = document.getElementById('raiseAmount');
+            input.value = amount;
+            input.blur();
+            await performAction('raise', amount);
         }
 
-        async function performAction(action) {
+        let actionSubmissionBusy = false;
+        async function performAction(action, specifiedAmount = null) {
+            if (actionSubmissionBusy) return;
             let amount = 0;
             if (action === 'raise') {
-                amount = Math.round(parseFloat(document.getElementById('raiseAmount').value));
+                amount = specifiedAmount === null ? Math.round(parseFloat(document.getElementById('raiseAmount').value)) : specifiedAmount;
                 if (!amount || amount <= 0) return alert('請輸入加注金額');
             }
-            const res = await api('/game_action', 'POST', {
-                game_id: gameId,
-                user_id: userId,
-                action: action,
-                amount: amount,
-                expected_action_count: proState?.action_count
-            });
-            if (res.game_state) updateUI(res.game_state);
-            if (!res.success) alert(res.message || '操作未成功');
+            actionSubmissionBusy = true;
+            const controls = document.getElementById('game-controls');
+            controls?.setAttribute('aria-busy', 'true');
+            controls?.querySelectorAll('button').forEach(button => button.disabled = true);
+            try {
+                const res = await api('/game_action', 'POST', {
+                    game_id: gameId,
+                    user_id: userId,
+                    action: action,
+                    amount: amount,
+                    expected_action_count: proState?.action_count
+                });
+                if (res.game_state) updateUI(res.game_state);
+                if (!res.success) alert(res.message || '操作未成功');
+            } catch {
+                alert('連線中斷，請先確認牌局狀態再操作');
+            } finally {
+                actionSubmissionBusy = false;
+                controls?.removeAttribute('aria-busy');
+                if (proState) updateUI(proState);
+            }
         }
 
         let knownHandKey = null;
@@ -935,7 +952,7 @@
             if(suit==='h') suitIcon='♥\uFE0E';
             if(suit==='d') suitIcon='♦\uFE0E';
             if(suit==='c') suitIcon='♣\uFE0E';
-            return `<div class="card ${isRed ? 'red' : ''} ${isNew ? 'animate-deal' : ''}" data-suit="${suit}">
+            return `<div class="card ${isRed ? 'red' : ''} ${isNew ? 'animate-deal' : ''}" data-suit="${suit}" data-rank="${cardStr[0]}">
                         <span style="font-size:0.8em; align-self:flex-start; margin-left:2px;">${rank}</span>
                         <span style="font-size:1.5em;">${suitIcon}</span>
                     </div>`;
@@ -1186,5 +1203,6 @@
 <script src="/music-player.js"></script>
 <script src="/poker-atmosphere.js"></script>
 <script src="/card-themes.js"></script>
+<script src="/table-reactions.js"></script>
 </body>
 </html>
