@@ -194,7 +194,7 @@ body.allin-hand .action-rail { border-color:#976c46; }
 #my-hand-strength strong { display:block;color:#efdab2;font-size:15px;margin:3px 0;overflow-wrap:anywhere; }
 @media(min-width:600px) and (max-height:600px) { #my-hand-strength { padding:5px 7px; }#my-hand-strength strong { font-size:13px;margin:1px 0; }#my-hand-strength small { display:none; } }
 .header #music-toggle { padding:4px 8px;font-size:11px!important;min-height:28px; }
-/* Native audio needs no on-page player, so the controls stay in the header. */
+/* The generated jazz soundtrack needs no large player, so controls stay in the header. */
 #music-mini-tools { display:inline-flex;align-items:center;gap:3px; }
 #music-mini-tools button { padding:3px 5px;min-height:28px;min-width:28px; }
 .music-screen-reader { position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap; }

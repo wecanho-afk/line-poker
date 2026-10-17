@@ -44,3 +44,15 @@ test('good-hand celebration stays compact and above the action area',()=>{
  assert.doesNotMatch(rule,/top:49%|min-width:210px/);
  assert.match(css,/#hand-celebration>strong \{[^}]*font:600 18px/);
 });
+
+test('players can choose and persist eight distinct table colours',()=>{
+ const html=fs.readFileSync(path.join(__dirname,'../public/index.html'),'utf8');
+ const themes=fs.readFileSync(path.join(__dirname,'../public/table-themes.js'),'utf8');
+ const css=fs.readFileSync(path.join(__dirname,'../public/table-themes.css'),'utf8');
+ assert.match(html,/table-themes\.css/);assert.match(html,/table-themes\.js/);
+ for(const name of ['經典翡翠','深海藍','勃根地紅','皇家紫','黑曜灰','賭場紅','湖水青','雪茄橄欖'])assert.match(themes,new RegExp(name));
+ assert.equal((themes.match(/^\s*\['[a-z-]+','/gm)||[]).length,8);
+ assert.match(themes,/localStorage\.setItem\('poker-table-theme'/);assert.match(themes,/document\.body\.dataset\.tableTheme/);
+ for(const id of ['emerald','sapphire','burgundy','amethyst','charcoal','crimson','teal','olive'])assert.match(css,new RegExp(`data-table-theme="${id}"`));
+ assert.match(css,/radial-gradient\(ellipse at 48% 35%,var\(--felt-light\)/);
+});
