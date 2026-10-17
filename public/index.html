@@ -867,6 +867,8 @@
         }
 
         function showGame() {
+            lastActionCount = -1;
+            window.PokerPotSound?.enter(gameId);
             document.getElementById('setup-view').style.display = 'none';
             document.getElementById('game-view').style.display = 'flex';
             document.getElementById('room-id').textContent = gameId;
@@ -1191,6 +1193,8 @@
                     const utterance = new SpeechSynthesisUtterance(state.latest_voice);
                     utterance.lang = 'en-US';
                     utterance.rate = 1.1;
+                    utterance.volume = .85;
+                    window.PokerAudioMix?.duck(Math.max(900, Math.min(3200, state.latest_voice.length * 140 + 650)));
                     window.speechSynthesis.speak(utterance);
                 }
             }

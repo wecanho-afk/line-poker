@@ -231,6 +231,7 @@ function returnToLobby() {
     document.getElementById('voice-chat-btn').classList.replace('btn-red','btn-blue');
     if(socket){socket.disconnect();socket=null;}
     if(timerInterval)clearInterval(timerInterval);if(tournamentInterval)clearInterval(tournamentInterval);
+    window.PokerPotSound?.leave();lastActionCount=-1;
     gameId='';proState=null;isHost=false;knownCommunityCards=[];knownPlayerCards={};
     const status=document.getElementById('sync-status');if(status)status.hidden=true;
     document.getElementById('turn-timer-display').textContent='';

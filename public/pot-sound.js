@@ -1,7 +1,7 @@
 /* A recorded poker-chip push plays once when a settled pot moves to its winner. */
 (() => {
   const CUE_URL='/audio/poker-chip-collect.mp3';
-  let audio,playedKey='',enabled=true,unlocked=false,unlocking=false;
+  let audio,playedKey='',sessionKey='',enabled=true,unlocked=false,unlocking=false;
 
   function ensureAudio(){
     if(audio)return audio;
@@ -10,7 +10,7 @@
     audio=new AudioPlayer(CUE_URL);
     audio.preload='auto';
     audio.playsInline=true;
-    audio.volume=.72;
+    audio.volume=.62;
     audio.load?.();
     return audio;
   }
@@ -21,6 +21,14 @@
     try{audio.currentTime=0;}catch{}
   }
 
+  function discardAudio(){
+    stop();
+    if(audio){try{audio.removeAttribute?.('src');audio.load?.();}catch{}}
+    audio=null;
+    unlocked=false;
+    unlocking=false;
+  }
+
   function play(){
     if(!enabled)return;
     const cue=ensureAudio();
@@ -28,9 +36,10 @@
     cue.pause();
     try{cue.currentTime=0;}catch{}
     cue.muted=false;
-    cue.volume=.72;
+    cue.volume=.62;
+    window.PokerAudioMix?.duck(1400);
     const promise=cue.play();
-    promise?.catch?.(()=>{});
+    promise?.catch?.(()=>{unlocked=false;});
   }
 
   // iOS browsers allow later game-event playback after a media element has
@@ -45,7 +54,7 @@
       cue.pause();
       try{cue.currentTime=0;}catch{}
       cue.muted=false;
-      cue.volume=.72;
+      cue.volume=.62;
       unlocked=success;
       unlocking=false;
     };
@@ -64,7 +73,9 @@
 
   document.addEventListener('pointerdown',unlock,{passive:true});
   window.PokerPotSound={
-    setEnabled(value){enabled=!!value;if(enabled)ensureAudio();else stop();}
+    setEnabled(value){enabled=!!value;if(enabled)ensureAudio();else stop();},
+    enter(nextSession){if(nextSession!==sessionKey){sessionKey=nextSession||'';playedKey='';}ensureAudio();},
+    leave(){sessionKey='';playedKey='';discardAudio();}
   };
   const update=proUpdate;
   proUpdate=function(state){update(state);sync(state);};
