@@ -56,3 +56,10 @@ test('players can choose and persist eight distinct table colours',()=>{
  for(const id of ['emerald','sapphire','burgundy','amethyst','charcoal','crimson','teal','olive'])assert.match(css,new RegExp(`data-table-theme="${id}"`));
  assert.match(css,/radial-gradient\(ellipse at 48% 35%,var\(--felt-light\)/);
 });
+
+test('table reactions remain visible for four seconds in both script and animation',()=>{
+ const script=fs.readFileSync(path.join(__dirname,'../public/table-reactions.js'),'utf8');
+ const css=fs.readFileSync(path.join(__dirname,'../public/table-reactions.css'),'utf8');
+ assert.match(script,/STICKER_VISIBLE_MS=4000/);assert.match(script,/reaction\.remove\(\),STICKER_VISIBLE_MS/);
+ assert.match(css,/animation:sticker-pop 4s/);assert.doesNotMatch(css,/sticker-pop 2\.8s/);
+});

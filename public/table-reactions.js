@@ -1,5 +1,6 @@
 /* Lightweight room reactions: the server accepts fixed sticker IDs only. */
 (() => {
+  const STICKER_VISIBLE_MS=4000;
   const stickers={
     nice:{emoji:'👏',label:'好牌'},wow:{emoji:'😲',label:'哇！'},gg:{emoji:'🤝',label:'GG'},laugh:{emoji:'😂',label:'笑死'},
     cheer:{emoji:'🔥',label:'漂亮'},thanks:{emoji:'🙏',label:'謝啦'},coffee:{emoji:'☕',label:'想一下'},fish:{emoji:'🐟',label:'上鉤了'}
@@ -14,13 +15,19 @@
     const choice=document.createElement('button');choice.type='button';choice.dataset.sticker=id;choice.innerHTML=`<span>${item.emoji}</span><strong>${item.label}</strong>`;
     choice.onclick=()=>send(id);grid.append(choice);
   }
+  function position(reaction){
+    const table=document.getElementById('poker-table'),seat=document.querySelector(`.player-seat[data-player-id="${CSS.escape(reaction.dataset.playerId)}"]`);
+    if(!seat){reaction.style.left='50%';reaction.style.top='44%';return;}
+    const tableBox=table.getBoundingClientRect(),seatBox=seat.getBoundingClientRect();
+    reaction.style.left=(seatBox.left-tableBox.left+seatBox.width/2)+'px';reaction.style.top=Math.max(2,seatBox.top-tableBox.top-36)+'px';
+  }
+  function positionActive(){document.querySelectorAll('#poker-table > .seat-sticker').forEach(position);}
   function render(data){
     const item=stickers[data?.id];if(!item||!data.user_id)return;
-    const seat=document.querySelector(`.player-seat[data-player-id="${CSS.escape(data.user_id)}"]`);
-    const host=seat||document.getElementById('poker-table');
-    host.querySelectorAll(':scope > .seat-sticker').forEach(node=>node.remove());
-    const reaction=document.createElement('div');reaction.className='seat-sticker';reaction.setAttribute('role','status');reaction.innerHTML=`<span>${item.emoji}</span><strong>${item.label}</strong>`;
-    host.append(reaction);setTimeout(()=>reaction.remove(),2800);
+    const table=document.getElementById('poker-table');
+    Array.from(table.children).filter(node=>node.classList.contains('seat-sticker')&&node.dataset.playerId===String(data.user_id)).forEach(node=>node.remove());
+    const reaction=document.createElement('div');reaction.className='seat-sticker';reaction.dataset.playerId=String(data.user_id);reaction.setAttribute('role','status');reaction.innerHTML=`<span>${item.emoji}</span><strong>${item.label}</strong>`;
+    table.append(reaction);position(reaction);setTimeout(()=>reaction.remove(),STICKER_VISIBLE_MS);
   }
   function bindSocket(){
     if(!socket||socket.__tableStickerBound)return;
@@ -37,5 +44,7 @@
     });
   }
   const originalInit=initSocket;initSocket=function(){originalInit();bindSocket();};
+  const originalUpdate=proUpdate;proUpdate=function(state){originalUpdate(state);requestAnimationFrame(positionActive);};
+  window.addEventListener('resize',()=>requestAnimationFrame(positionActive));
   button.onclick=()=>{status.textContent='同桌玩家都會看到貼圖。';dialog.showModal();};dialog.querySelector('.sticker-close').onclick=()=>dialog.close();
 })();
