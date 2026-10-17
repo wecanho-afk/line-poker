@@ -1,32 +1,37 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 
 function harness(){
- let starts=0,updates=0;
- const param=()=>({value:0,setValueAtTime(){},exponentialRampToValueAtTime(){}});
- const node=()=>({connect(){},addEventListener(){},start(){starts++;},stop(){},frequency:param(),gain:param(),pan:param(),threshold:param(),knee:param(),ratio:param(),attack:param(),release:param(),Q:{value:0},type:''});
- class AudioContext {
-  constructor(){this.state='running';this.currentTime=10;this.sampleRate=1000;this.destination=node();}
-  createGain(){return node();}createDynamicsCompressor(){return node();}createStereoPanner(){return node();}createOscillator(){return node();}createBufferSource(){return node();}createBiquadFilter(){return node();}
-  createBuffer(channels,length){const data=new Float32Array(length);return {getChannelData(){return data;}};}resume(){this.state='running';return Promise.resolve();}
+ let plays=0,pauses=0,loads=0,updates=0,pointerdown;
+ class AudioPlayer {
+  constructor(src){this.src=src;this.currentTime=0;this.muted=false;this.volume=1;this.preload='';this.playsInline=false;}
+  load(){loads++;}play(){plays++;return Promise.resolve();}pause(){pauses++;}
  }
- const document={addEventListener(){}};
- const context={window:{AudioContext},document,gameVoiceEnabled:true,proUpdate(){updates++;},setTimeout(){},Math,console};
+ const document={addEventListener(type,listener){if(type==='pointerdown')pointerdown=listener;}};
+ const context={window:{Audio:AudioPlayer},document,gameVoiceEnabled:true,proUpdate(){updates++;},console};
  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../public/pot-sound.js'),'utf8'),context);
- return {context,get starts(){return starts;},get updates(){return updates;}};
+ return {context,pointer(){pointerdown?.();},get plays(){return plays;},get pauses(){return pauses;},get loads(){return loads;},get updates(){return updates;}};
 }
 
-test('settled pot sound plays once per hand, including a split pot, and respects the sound toggle',()=>{
+test('settled pot recording plays once per hand, including a split pot, and respects the sound toggle',()=>{
  const h=harness(),state=(hand,winners=['hero'])=>({game_state:'showdown',game_id:'room',hand_number:hand,winners});
- h.context.proUpdate({game_state:'river',game_id:'room',hand_number:1,winners:[]});assert.equal(h.starts,0);
- h.context.proUpdate(state(1));const first=h.starts;assert.ok(first>20);
- h.context.proUpdate(state(1));assert.equal(h.starts,first);
- h.context.proUpdate(state(2,['hero','other']));const second=h.starts;assert.equal(second,first*2);
- h.context.window.PokerPotSound.setEnabled(false);h.context.proUpdate(state(3));assert.equal(h.starts,second);
- h.context.window.PokerPotSound.setEnabled(true);h.context.proUpdate(state(4));assert.equal(h.starts,second+first);
- assert.equal(h.updates,6);
+ h.context.proUpdate({game_state:'river',game_id:'room',hand_number:1,winners:[]});assert.equal(h.plays,0);
+ h.context.proUpdate(state(1));const first=h.plays;assert.equal(first,1);
+ h.context.proUpdate(state(1));assert.equal(h.plays,first);
+ h.context.proUpdate(state(2,['hero','other']));const second=h.plays;assert.equal(second,2);
+ h.context.window.PokerPotSound.setEnabled(false);h.context.proUpdate(state(3));assert.equal(h.plays,second);
+ h.context.window.PokerPotSound.setEnabled(true);h.context.proUpdate(state(4));assert.equal(h.plays,second+1);
+ assert.equal(h.loads,1);assert.ok(h.pauses>=3);assert.equal(h.updates,6);
 });
 
-test('chip cue is generated locally and does not load an external audio file',()=>{
+test('a pointer gesture unlocks the recording for later mobile playback',async()=>{
+ const h=harness();h.pointer();await Promise.resolve();
+ assert.equal(h.plays,1);assert.ok(h.pauses>=1);
+});
+
+test('chip cue uses the bundled CC0 recording and keeps its license record',()=>{
  const source=fs.readFileSync(path.join(__dirname,'../public/pot-sound.js'),'utf8');
- assert.doesNotMatch(source,/https?:\/\/|\.mp3|\.wav/);assert.match(source,/createOscillator/);assert.match(source,/createBufferSource/);assert.match(source,/STEREO|createStereoPanner/i);
+ const audio=path.join(__dirname,'../public/audio/poker-chip-collect.mp3');
+ const licenses=fs.readFileSync(path.join(__dirname,'../public/audio/LICENSES.md'),'utf8');
+ assert.doesNotMatch(source,/https?:\/\//);assert.match(source,/\/audio\/poker-chip-collect\.mp3/);
+ assert.ok(fs.statSync(audio).size>20000);assert.match(licenses,/AllInPushChips\.wav/);assert.match(licenses,/Creative Commons Zero|CC0/i);
 });
