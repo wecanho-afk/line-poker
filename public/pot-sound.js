@@ -37,7 +37,6 @@
     try{cue.currentTime=0;}catch{}
     cue.muted=false;
     cue.volume=.62;
-    window.PokerAudioMix?.duck(1400);
     const promise=cue.play();
     promise?.catch?.(()=>{unlocked=false;});
   }

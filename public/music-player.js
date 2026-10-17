@@ -5,8 +5,8 @@ window.PokerMusicPlayer={create(button){
  const next=document.createElement('button');next.type='button';next.id='music-next';next.textContent='⏭';next.title='下一首爵士配樂';next.setAttribute('aria-label','下一首爵士配樂');
  const status=document.createElement('span');status.id='music-player-status';status.className='music-screen-reader';status.setAttribute('role','status');
  button.after(tools);tools.append(next,status);
- const MUSIC_LEVEL=.48,DUCK_LEVEL=.2;
- let enabled=false,context,bus,master,noiseBuffer,loopTimer,duckTimer,duckUntil=0,playToken=0,loopCount=0;
+ const MUSIC_LEVEL=.48;
+ let enabled=false,context,bus,master,noiseBuffer,loopTimer,playToken=0,loopCount=0;
  const active=new Set();
  if(navigator.audioSession)navigator.audioSession.type='playback';
  function show(text){status.textContent=text;button.title=text;}
@@ -15,14 +15,10 @@ window.PokerMusicPlayer={create(button){
  function midi(note){return 440*Math.pow(2,(note-69)/12);}
  function makeImpulse(ctx){const length=Math.floor(ctx.sampleRate*1.7),impulse=ctx.createBuffer(2,length,ctx.sampleRate);for(let channel=0;channel<2;channel++){const data=impulse.getChannelData(channel);for(let i=0;i<length;i++)data[i]=(Math.random()*2-1)*Math.pow(1-i/length,2.4);}return impulse;}
  function makeNoise(ctx){const length=Math.floor(ctx.sampleRate*1.2),buffer=ctx.createBuffer(1,length,ctx.sampleRate),data=buffer.getChannelData(0);for(let i=0;i<length;i++)data[i]=Math.random()*2-1;return buffer;}
- function setMasterLevel(value,timeConstant){if(!master||!context)return;const gain=master.gain,now=context.currentTime;gain.cancelScheduledValues?.(now);if(gain.setTargetAtTime)gain.setTargetAtTime(value,now,timeConstant);else gain.value=value;}
- function restoreMix(){clearTimeout(duckTimer);const remaining=duckUntil-Date.now();if(remaining>0){duckTimer=setTimeout(restoreMix,remaining);return;}setMasterLevel(MUSIC_LEVEL,.12);}
- function duck(duration=1200){duckUntil=Math.max(duckUntil,Date.now()+Math.max(300,duration));setMasterLevel(DUCK_LEVEL,.035);clearTimeout(duckTimer);duckTimer=setTimeout(restoreMix,Math.max(0,duckUntil-Date.now()));}
- window.PokerAudioMix={duck};
  function ensureAudio(){
   if(context)return true;const AudioContext=window.AudioContext||window.webkitAudioContext;if(!AudioContext)return false;
   context=new AudioContext();bus=context.createGain();master=context.createGain();const dry=context.createGain(),wet=context.createGain(),reverb=context.createConvolver(),compressor=context.createDynamicsCompressor();
-  bus.gain.value=.82;dry.gain.value=.88;wet.gain.value=.16;master.gain.value=Date.now()<duckUntil?DUCK_LEVEL:MUSIC_LEVEL;reverb.buffer=makeImpulse(context);
+  bus.gain.value=.82;dry.gain.value=.88;wet.gain.value=.16;master.gain.value=MUSIC_LEVEL;reverb.buffer=makeImpulse(context);
   compressor.threshold.value=-20;compressor.knee.value=15;compressor.ratio.value=3;compressor.attack.value=.015;compressor.release.value=.3;
   bus.connect(dry);dry.connect(compressor);bus.connect(reverb);reverb.connect(wet);wet.connect(compressor);compressor.connect(master);master.connect(context.destination);noiseBuffer=makeNoise(context);return true;
  }

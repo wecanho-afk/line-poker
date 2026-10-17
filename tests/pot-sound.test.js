@@ -1,15 +1,15 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 
 function harness(){
- let plays=0,pauses=0,loads=0,updates=0,instances=0,ducks=0,pointerdown;
+ let plays=0,pauses=0,loads=0,updates=0,instances=0,pointerdown;
  class AudioPlayer {
   constructor(src){instances++;this.src=src;this.currentTime=0;this.muted=false;this.volume=1;this.preload='';this.playsInline=false;}
   load(){loads++;}play(){plays++;return Promise.resolve();}pause(){pauses++;}removeAttribute(name){if(name==='src')this.src='';}
  }
  const document={addEventListener(type,listener){if(type==='pointerdown')pointerdown=listener;}};
- const context={window:{Audio:AudioPlayer,PokerAudioMix:{duck(){ducks++;}}},document,gameVoiceEnabled:true,proUpdate(){updates++;},console};
+ const context={window:{Audio:AudioPlayer},document,gameVoiceEnabled:true,proUpdate(){updates++;},console};
  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../public/pot-sound.js'),'utf8'),context);
- return {context,pointer(){pointerdown?.();},get plays(){return plays;},get pauses(){return pauses;},get loads(){return loads;},get instances(){return instances;},get ducks(){return ducks;},get updates(){return updates;}};
+ return {context,pointer(){pointerdown?.();},get plays(){return plays;},get pauses(){return pauses;},get loads(){return loads;},get instances(){return instances;},get updates(){return updates;}};
 }
 
 test('settled pot recording plays once per hand, including a split pot, and respects the sound toggle',()=>{
@@ -20,7 +20,7 @@ test('settled pot recording plays once per hand, including a split pot, and resp
  h.context.proUpdate(state(2,['hero','other']));const second=h.plays;assert.equal(second,2);
  h.context.window.PokerPotSound.setEnabled(false);h.context.proUpdate(state(3));assert.equal(h.plays,second);
  h.context.window.PokerPotSound.setEnabled(true);h.context.proUpdate(state(4));assert.equal(h.plays,second+1);
- assert.equal(h.loads,1);assert.equal(h.ducks,3);assert.ok(h.pauses>=3);assert.equal(h.updates,6);
+ assert.equal(h.loads,1);assert.ok(h.pauses>=3);assert.equal(h.updates,6);
 });
 
 test('a pointer gesture unlocks the recording for later mobile playback',async()=>{
@@ -33,7 +33,7 @@ test('leaving and entering the same room creates a fresh playable sound session'
  h.context.window.PokerPotSound.enter('room');h.context.proUpdate(state);assert.equal(h.plays,1);
  h.context.window.PokerPotSound.leave();h.pointer();await Promise.resolve();
  h.context.window.PokerPotSound.enter('room');h.context.proUpdate(state);
- assert.equal(h.plays,3);assert.equal(h.instances,2);assert.equal(h.ducks,2);
+ assert.equal(h.plays,3);assert.equal(h.instances,2);
 });
 
 test('chip cue uses the bundled CC0 recording and keeps its license record',()=>{

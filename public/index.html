@@ -1194,7 +1194,6 @@
                     utterance.lang = 'en-US';
                     utterance.rate = 1.1;
                     utterance.volume = .85;
-                    window.PokerAudioMix?.duck(Math.max(900, Math.min(3200, state.latest_voice.length * 140 + 650)));
                     window.speechSynthesis.speak(utterance);
                 }
             }

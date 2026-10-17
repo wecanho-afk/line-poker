@@ -22,10 +22,8 @@ test('jazz is synthesized locally with piano, bass, brushes and no copied stream
  assert.match(player,/navigator\.audioSession/);assert.match(player,/context\.resume\(\)/);
 });
 
-test('background music ducks smoothly while game sounds play',()=>{
+test('background music keeps a fixed level while game sounds play',()=>{
  const player=fs.readFileSync(path.join(__dirname,'../public/music-player.js'),'utf8');
- assert.match(player,/MUSIC_LEVEL=\.48,DUCK_LEVEL=\.2/);
- assert.match(player,/window\.PokerAudioMix=\{duck\}/);
- assert.match(player,/setTargetAtTime\(value,now,timeConstant\)/);
- assert.match(player,/duckUntil=Math\.max/);
+ assert.match(player,/MUSIC_LEVEL=\.48/);assert.match(player,/master\.gain\.value=MUSIC_LEVEL/);
+ assert.doesNotMatch(player,/PokerAudioMix|DUCK_LEVEL|duckUntil|setTargetAtTime/);
 });
