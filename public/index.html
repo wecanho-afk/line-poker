@@ -393,6 +393,7 @@
             gameVoiceEnabled = !gameVoiceEnabled;
             document.getElementById('voice-toggle').textContent = gameVoiceEnabled ? '🔊 遊戲音效: 開' : '🔇 遊戲音效: 關';
             if (!gameVoiceEnabled && window.speechSynthesis) window.speechSynthesis.cancel();
+            window.PokerPotSound?.setEnabled(gameVoiceEnabled);
         }
         let userAvatar = '';
 
@@ -1210,5 +1211,6 @@
 <script src="/card-themes.js"></script>
 <script src="/table-reactions.js"></script>
 <script src="/table-themes.js"></script>
+<script src="/pot-sound.js"></script>
 </body>
 </html>

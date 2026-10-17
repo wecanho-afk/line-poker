@@ -63,3 +63,8 @@ test('table reactions remain visible for four seconds in both script and animati
  assert.match(script,/STICKER_VISIBLE_MS=4000/);assert.match(script,/reaction\.remove\(\),STICKER_VISIBLE_MS/);
  assert.match(css,/animation:sticker-pop 4s/);assert.doesNotMatch(css,/sticker-pop 2\.8s/);
 });
+
+test('the game sound toggle controls the local settled-pot chip cue',()=>{
+ const html=fs.readFileSync(path.join(__dirname,'../public/index.html'),'utf8');
+ assert.match(html,/src="\/pot-sound\.js"/);assert.match(html,/PokerPotSound\?\.setEnabled\(gameVoiceEnabled\)/);
+});
