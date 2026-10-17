@@ -46,6 +46,23 @@ test('trailing player proposes run once or twice and leader makes the final deci
  g.cancelScheduledAction();
 });
 
+test('locked all-in hands stay open during runout only when no side pot exists',()=>{
+ const heads=headsUp();heads.startGame();heads.cancelScheduledAction();
+ for(const p of Object.values(heads.players))Object.assign(p,{chips:0,invested:100,currentBet:100,allIn:true,folded:false,hasActed:true});
+ heads.pot=200;heads.currentBetAmount=100;heads.gameState='pre_flop';heads.activePlayersInRound=['a','b'];heads.endBettingRound();
+ assert.equal(heads.revealRunoutHands,true);
+ for(const player of heads.toJSON('spectator').players)assert.deepEqual(player.hand,heads.players[player.user_id].hand.map(String));
+ while(heads.runoutDecision){const actor=heads.runoutDecision.stage==='proposal'?heads.runoutDecision.proposerId:heads.runoutDecision.deciderId;heads.chooseRunout(actor,1);}
+ assert.equal(heads.scheduledAction.kind,'runout');
+ for(const player of heads.toJSON('spectator').players)assert.deepEqual(player.hand,heads.players[player.user_id].hand.map(String));
+
+ const side=headsUp();side.addPlayer('c','C');side.startGame();side.cancelScheduledAction();
+ for(const [id,invested] of [['a',100],['b',200],['c',200]])Object.assign(side.players[id],{chips:0,invested,currentBet:invested,allIn:true,folded:false,hasActed:true});
+ side.pot=500;side.currentBetAmount=200;side.gameState='pre_flop';side.activePlayersInRound=['a','b','c'];side.endBettingRound();
+ assert.equal(side.revealRunoutHands,false);
+ for(const player of side.toJSON('spectator').players)assert.deepEqual(player.hand,['??','??']);
+});
+
 test('run twice shares existing board cards without creating a fifth card of any rank',()=>{
  const g=headsUp();g.startGame();g.cancelScheduledAction();
  g.communityCards.push(...g.deck.deal(3));g.gameState='flop';

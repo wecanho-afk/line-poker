@@ -1,5 +1,5 @@
 /* Six approved card faces. The same rules power the table and the picker preview. */
-[data-card-theme] { --card-paper:linear-gradient(135deg,#fff,#efefeb);--card-ink:#15251f;--card-red:#c52f43;--card-edge:#fff;--card-back:repeating-linear-gradient(45deg,#263b48 0 2px,#1b2d38 2px 5px);--card-back-ink:#d9c38c;--card-diamond:var(--card-red);--card-club:var(--card-ink); }
+[data-card-theme] { --card-paper:#fff;--card-ink:#111b18;--card-red:#c52f43;--card-edge:#fff;--card-back:repeating-linear-gradient(45deg,#263b48 0 2px,#1b2d38 2px 5px);--card-back-ink:#d9c38c;--card-diamond:var(--card-red);--card-club:var(--card-ink); }
 [data-card-theme="royal"] { --card-paper:radial-gradient(circle at 50% 52%,#fff7d7,#ead6a7);--card-ink:#172a25;--card-red:#bd3049;--card-edge:#c79d4e;--card-back:repeating-conic-gradient(from 45deg,#7c1731 0 25%,#b69c5b 0 50%) 0/10px 10px;--card-back-ink:#fff0bd; }
 [data-card-theme="casino"] { --card-paper:radial-gradient(circle at 50% 44%,#26312c,#0d1210 72%);--card-ink:#f2e5bc;--card-red:#ed5364;--card-edge:#d5b665;--card-back:repeating-linear-gradient(45deg,#171d1a 0 3px,#b5944733 3px 5px);--card-back-ink:#d5b665;--card-diamond:var(--card-red);--card-club:var(--card-ink); }
 [data-card-theme="four-color"] { --card-paper:#172536;--card-ink:#fff;--card-red:#fff;--card-edge:#ffffff70;--card-back:repeating-linear-gradient(45deg,#203e48 0 2px,#325869 2px 5px);--card-back-ink:#fff;--card-diamond:#fff;--card-club:#fff; }
@@ -15,7 +15,7 @@ body[data-card-theme] .card::after,.theme-option .card::after { background:var(-
 .theme-option .card::after { display:none; }
 body[data-card-theme] .card:not(.card-back),.theme-option .card:not(.card-back) { position:relative;overflow:hidden;isolation:isolate;font-family:Arial Black,Arial,sans-serif;font-weight:900;text-shadow:none; }
 body[data-card-theme] .card-rank,.theme-option .card-rank { position:absolute;z-index:4;left:9%;top:6%;font-size:.68em;line-height:1;letter-spacing:-.06em; }
-body[data-card-theme] .card-suit,.theme-option .card-suit { position:absolute;z-index:4;left:50%;top:53%;font-size:1.45em;line-height:1;transform:translate(-50%,-43%); }
+body[data-card-theme] .card-suit,.theme-option .card-suit { position:absolute;z-index:4;left:50%;top:56%;font-size:1.45em;line-height:1;transform:translate(-50%,-43%); }
 .card-art { display:none;position:absolute;z-index:2;inset:23% 13% 15%;place-items:center;line-height:1;pointer-events:none; }
 .card-art .face-art { display:none;width:100%;height:100%;overflow:visible; }
 .card-art .skin { fill:#e7b67c; }.card-art .cloth,.card-art .solid { fill:currentColor; }.card-art .gold { fill:#d7aa50; }.card-art .paper { fill:#fff9df; }
@@ -60,7 +60,41 @@ body[data-card-theme="burgundy"] .card-art .gold,body[data-card-theme="burgundy"
 body[data-card-theme="burgundy"] .card-art .line,body[data-card-theme="burgundy"] .card-art .fine,.theme-option[data-card-theme="burgundy"] .card-art .line,.theme-option[data-card-theme="burgundy"] .card-art .fine { stroke:#f0d5a7; }
 
 /* Face-card themes keep the sole suit mark clear in the lower-right corner. */
-body[data-card-theme="royal"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-suit,body[data-card-theme="casino"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-suit,body[data-card-theme="midnight"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-suit,body[data-card-theme="burgundy"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-suit,.theme-option[data-card-theme="royal"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-suit,.theme-option[data-card-theme="casino"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-suit,.theme-option[data-card-theme="midnight"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-suit,.theme-option[data-card-theme="burgundy"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-suit { left:auto;right:7%;top:auto;bottom:5%;font-size:.58em;transform:none; }
+body[data-card-theme="royal"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-suit,body[data-card-theme="casino"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-suit,body[data-card-theme="midnight"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-suit,body[data-card-theme="burgundy"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-suit,.theme-option[data-card-theme="royal"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-suit,.theme-option[data-card-theme="casino"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-suit,.theme-option[data-card-theme="midnight"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-suit,.theme-option[data-card-theme="burgundy"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-suit { left:auto;right:5%;top:auto;bottom:4%;font-size:.82em;transform:none; }
+
+/* Picker isolation: the active table theme must never repaint the other five previews. */
+#card-theme-dialog .theme-option .card:not(.card-back) { background:var(--card-paper)!important;color:var(--card-ink)!important;border-color:var(--card-edge)!important;border-radius:6px;box-shadow:0 3px 7px #001a154a;font-family:Arial Black,Arial,sans-serif; }
+#card-theme-dialog .theme-option .card.red { color:var(--card-red)!important; }
+#card-theme-dialog .theme-option .card[data-suit="d"] { color:var(--card-diamond)!important; }
+#card-theme-dialog .theme-option .card[data-suit="c"] { color:var(--card-club)!important; }
+#card-theme-dialog .theme-option .card-rank { left:9%;top:6%;font-size:.68em; }
+#card-theme-dialog .theme-option .card-suit { left:50%;right:auto;top:56%;bottom:auto;font-size:1.45em;transform:translate(-50%,-43%); }
+#card-theme-dialog .theme-option .card-art { display:none;border:0;border-radius:0;background:none;filter:none; }
+#card-theme-dialog .theme-option .face-art { display:none; }
+#card-theme-dialog .theme-option[data-card-theme="royal"] .card:not(.card-back) { border-radius:13%;box-shadow:inset 0 0 0 2px #fff6ca,inset 0 0 0 3px #b89046,0 3px 7px #001a154a;font-family:Georgia,'Times New Roman',serif; }
+#card-theme-dialog .theme-option[data-card-theme="royal"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-art { display:grid;border:1px solid #b89046;border-radius:46% 46% 14% 14%;background:repeating-linear-gradient(45deg,#b18b3810 0 3px,transparent 3px 7px); }
+#card-theme-dialog .theme-option[data-card-theme="royal"] .face-art-royal { display:block; }
+#card-theme-dialog .theme-option[data-card-theme="royal"] .card-art .cloth { fill:currentColor;fill-opacity:1;stroke:none; }
+#card-theme-dialog .theme-option[data-card-theme="casino"] .card:not(.card-back) { border-radius:10%;box-shadow:inset 0 0 0 2px #0d1210,inset 0 0 0 3px #806c3a,0 3px 8px #0008;font-family:Georgia,'Times New Roman',serif; }
+#card-theme-dialog .theme-option[data-card-theme="casino"] .card-rank { color:#f6e9c0; }
+#card-theme-dialog .theme-option[data-card-theme="casino"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-art { display:grid;color:#d5b665;filter:drop-shadow(0 2px 3px #000); }
+#card-theme-dialog .theme-option[data-card-theme="casino"] .face-art-casino { display:block; }
+#card-theme-dialog .theme-option[data-card-theme="casino"] .card-art .gold,#card-theme-dialog .theme-option[data-card-theme="casino"] .card-art .solid { fill:#d5b665; }
+#card-theme-dialog .theme-option[data-card-theme="casino"] .card-art .paper { fill:#171e1b; }
+#card-theme-dialog .theme-option[data-card-theme="casino"] .card-art .line,#card-theme-dialog .theme-option[data-card-theme="casino"] .card-art .fine { stroke:#d5b665; }
+#card-theme-dialog .theme-option[data-card-theme="four-color"] .card:not(.card-back) { color:#fff!important;border-color:#ffffff70!important;box-shadow:inset 0 0 0 2px #ffffff18,inset 0 -8px 18px #0002,0 3px 7px #001a154a; }
+#card-theme-dialog .theme-option[data-card-theme="four-color"] .card[data-suit="s"] { background:#172536!important; }#card-theme-dialog .theme-option[data-card-theme="four-color"] .card[data-suit="c"] { background:#14734e!important; }#card-theme-dialog .theme-option[data-card-theme="four-color"] .card[data-suit="d"] { background:#2865c5!important; }#card-theme-dialog .theme-option[data-card-theme="four-color"] .card[data-suit="h"] { background:#c62b45!important; }
+#card-theme-dialog .theme-option[data-card-theme="midnight"] .card:not(.card-back) { border-color:currentColor!important;box-shadow:inset 0 0 12px color-mix(in srgb,currentColor 18%,transparent),0 0 8px color-mix(in srgb,currentColor 22%,transparent); }
+#card-theme-dialog .theme-option[data-card-theme="midnight"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-art { display:grid;filter:drop-shadow(0 0 4px currentColor); }
+#card-theme-dialog .theme-option[data-card-theme="midnight"] .face-art-midnight { display:block; }
+#card-theme-dialog .theme-option[data-card-theme="midnight"] .face-art-midnight * { fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round; }
+#card-theme-dialog .theme-option[data-card-theme="burgundy"] .card:not(.card-back) { border-radius:7%;box-shadow:inset 0 0 0 2px #5c172a,inset 0 0 0 3px #d1a76977,inset 0 0 18px #21050caa,0 3px 8px #21060d99;font-family:Georgia,'Times New Roman',serif; }
+#card-theme-dialog .theme-option[data-card-theme="burgundy"] .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-art { display:grid;border:3px double #e4c38888;border-radius:50% 50% 12% 12%;color:#f0d5a7;filter:drop-shadow(0 2px 2px #26050c); }
+#card-theme-dialog .theme-option[data-card-theme="burgundy"] .face-art-burgundy { display:block; }
+#card-theme-dialog .theme-option[data-card-theme="burgundy"] .card-art .cloth { fill:#e4c388;fill-opacity:.18;stroke:#e4c388;stroke-width:1.7; }
+#card-theme-dialog .theme-option[data-card-theme="burgundy"] .card-art .gold,#card-theme-dialog .theme-option[data-card-theme="burgundy"] .card-art .solid { fill:#d7ae6d; }
+#card-theme-dialog .theme-option[data-card-theme="burgundy"] .card-art .line,#card-theme-dialog .theme-option[data-card-theme="burgundy"] .card-art .fine { stroke:#f0d5a7; }
+#card-theme-dialog .theme-option:is([data-card-theme="royal"],[data-card-theme="casino"],[data-card-theme="midnight"],[data-card-theme="burgundy"]) .card:is([data-rank="J"],[data-rank="Q"],[data-rank="K"]) .card-suit { left:auto;right:5%;top:auto;bottom:4%;font-size:.82em;transform:none; }
 .header #card-theme-toggle { white-space:nowrap; }
 #card-theme-dialog { width:min(650px,94vw);padding:25px;max-height:90dvh;overflow:auto;background:linear-gradient(145deg,#1b3029,#0c1d1a);color:#efe4cf;border:1px solid #c7aa6e66;border-radius:18px; }
 #card-theme-dialog::backdrop { background:#030b0cba;backdrop-filter:blur(6px); }

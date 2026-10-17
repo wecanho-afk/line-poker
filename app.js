@@ -12,6 +12,7 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
 const TABLE_STICKERS = new Set(['nice','wow','gg','laugh','cheer','thanks','coffee','fish']);
 const STICKER_COOLDOWN_MS = 1500;
+const SHOWDOWN_REVEAL_MS = 4000;
 const LINE_CHANNEL_ID = process.env.LINE_CHANNEL_ID || '2010219463';
 
 async function verifyLineUser(accessToken, expectedUserId, fetchImpl = fetch) {
@@ -289,6 +290,7 @@ class TexasHoldemGame {
         this.runoutBoards = null;
         this.runoutCount = 1;
         this.runoutSharedCount = 0;
+        this.revealRunoutHands = false;
         this.turnDeadline = 0;
         this.turnTimeout = null;
         this.lastRaiseAmount = 20; // 追蹤上一次加注的增量，初始為大盲
@@ -420,6 +422,7 @@ class TexasHoldemGame {
         this.runoutBoards = null;
         this.runoutCount = 1;
         this.runoutSharedCount = 0;
+        this.revealRunoutHands = false;
         
         if (this.tournamentManager) {
             this.tournamentManager.startTournament();
@@ -558,7 +561,7 @@ class TexasHoldemGame {
         this.gameState = 'showdown';
         history.finish(this);
         
-        this.scheduleAction('next', 2000);
+        this.scheduleAction('next', SHOWDOWN_REVEAL_MS);
         broadcastState(this.gameId);
     }
 
@@ -587,6 +590,7 @@ class TexasHoldemGame {
 
     beginRunoutDecision() {
         const contenders=this.activePlayersInRound.map(id=>this.players[id]).filter(p=>!p.folded);
+        this.revealRunoutHands=!this.hasContestableSidePot();
         if(this.practice||contenders.length<2){this.startRunout(1);return;}
         const equities=this.estimateRunoutEquities(contenders),ranked=[...contenders].sort((a,b)=>equities.get(a)-equities.get(b)||this.playersOrder.indexOf(a.userId)-this.playersOrder.indexOf(b.userId));
         const proposer=ranked[0],decider=ranked.at(-1);
@@ -594,6 +598,17 @@ class TexasHoldemGame {
         this.runoutDecision={stage:'proposal',proposerId:proposer.userId,deciderId:decider.userId,proposedRuns:null};
         this.messages.push(`${proposer.name} 目前落後，可提議剩餘公共牌發一次或兩次`);
         this.scheduleRunoutChoice();
+    }
+
+    hasContestableSidePot() {
+        const investors=Object.values(this.players).filter(p=>(p.invested||0)>0);
+        const levels=[...new Set(investors.map(p=>p.invested))].sort((a,b)=>a-b);
+        const eligibleSets=new Set();
+        for(const level of levels){
+            const eligible=investors.filter(p=>!p.folded&&p.invested>=level).map(p=>p.userId).sort();
+            if(eligible.length)eligibleSets.add(eligible.join('|'));
+        }
+        return eligibleSets.size>1;
     }
 
     scheduleRunoutChoice() {
@@ -1103,7 +1118,7 @@ class TexasHoldemGame {
         this.actionCount++;
         this.latestVoice = 'winner';
         
-        this.scheduleAction('next', 2000);
+        this.scheduleAction('next', SHOWDOWN_REVEAL_MS);
         broadcastState(this.gameId);
     }
 
@@ -1243,7 +1258,10 @@ class TexasHoldemGame {
             bb_id: this.bigBlindId,
             players: this.playersOrder.map(id => {
                 const p = this.players[id];
-                const showCards = p.userId === userId || (this.gameState === 'showdown' && !p.folded && this.activePlayersInRound.filter(id => !this.players[id].folded).length > 1);
+                const liveShowdown = this.gameState === 'showdown' && !p.folded && this.activePlayersInRound.filter(id => !this.players[id].folded).length > 1;
+                const lockedRunout = this.revealRunoutHands && !p.folded &&
+                    (!!this.runoutDecision || this.scheduledAction?.kind === 'runout');
+                const showCards = p.userId === userId || liveShowdown || lockedRunout;
                 return {
                     user_id: p.userId,
                     bot_style: p.isBot ? p.personality?.label : null,

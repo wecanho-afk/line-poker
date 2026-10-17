@@ -28,9 +28,19 @@ test('card themes expose the six approved distinct designs and the reaction clie
  for(const name of ['經典大字','歐式宮廷','黑金賭場','四色大花','午夜幾何','酒紅雕版']) assert.match(themes,new RegExp(name));
  assert.doesNotMatch(themes,/深海藍圖|薄荷清新/);
  assert.equal((themes.match(/^\s*\['[^\n]+$/gm)||[]).length,6);
+ assert.match(css,/\[data-card-theme\] \{ --card-paper:#fff/);
+ assert.match(css,/Picker isolation/);
  assert.match(css,/data-card-theme="four-color"[\s\S]*?background:#c62b45/);
  for(const design of ['face-art-royal','face-art-casino','face-art-midnight','face-art-burgundy']) assert.match(art,new RegExp(design));
  assert.match(art,/renderCardFaceArt/);assert.doesNotMatch(art,/>[JQK][<]/);
  assert.match(css,/data-card-theme="burgundy"[\s\S]*?face-art-burgundy/);
  assert.match(css,/data-card-theme="midnight"[\s\S]*?face-art-midnight/);
+});
+
+test('good-hand celebration stays compact and above the action area',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'../public/poker-premium.css'),'utf8');
+ const rule=css.match(/#hand-celebration \{[^}]+\}/)?.[0]||'';
+ assert.match(rule,/top:16%/);assert.match(rule,/max-width:46%/);assert.match(rule,/min-width:150px/);
+ assert.doesNotMatch(rule,/top:49%|min-width:210px/);
+ assert.match(css,/#hand-celebration>strong \{[^}]*font:600 18px/);
 });

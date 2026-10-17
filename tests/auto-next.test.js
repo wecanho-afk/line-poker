@@ -6,9 +6,9 @@ process.env.POKER_HISTORY_DIR=fs.mkdtempSync(path.join(os.tmpdir(),'poker-auto-n
 const {TexasHoldemGame,io,server}=require('../app');
 const games=[];
 function make(limit=50){const g=new TexasHoldemGame('auto-'+games.length,'a','A',1000,'cash',10,600,2,limit);g.addPlayer('b','B');games.push(g);g.startGame();g.cancelScheduledAction();return g;}
-test('fold settlement allows showing cards for two seconds then deals exactly one next hand',()=>{
+test('fold settlement allows showing cards for four seconds then deals exactly one next hand',()=>{
  const g=make(),started=Date.now();g.playerAction(g.getCurrentPlayer().userId,'fold');
- const due=g.scheduledAction.due;assert.equal(g.scheduledAction.kind,'next');assert.ok(due-started>=2000&&due-started<2100);
+ const due=g.scheduledAction.due;assert.equal(g.scheduledAction.kind,'next');assert.ok(due-started>=4000&&due-started<4100);
  assert.equal(g.gameState,'showdown');assert.equal(g.canShowCards(g.players.a),true);
  assert.equal(g.showCards('a',1,[0])[0],true);
  g.advanceDueAction(due-1);assert.equal(g.handNumber,1);
@@ -16,11 +16,11 @@ test('fold settlement allows showing cards for two seconds then deals exactly on
  assert.deepEqual(g.players.a.shownCardIndexes,[]);assert.equal(g.showCards('a',1,[1])[0],false);
  g.advanceDueAction(due);assert.equal(g.handNumber,2);
 });
-test('contested and run-twice showdowns both use a two-second pause',()=>{
+test('contested and run-twice showdowns both use a four-second pause',()=>{
  for(const twice of [false,true]){
   const g=make();g.communityCards.push(...g.deck.deal(5));
   if(twice){g.runoutBoards=[[...g.communityCards],g.deck.deal(5)];g.runoutCount=2;g.runoutSharedCount=0;}
-  const started=Date.now();g.determineWinner();assert.equal(g.gameState,'showdown');assert.ok(g.scheduledAction.due-started>=2000&&g.scheduledAction.due-started<2100);
+  const started=Date.now();g.determineWinner();assert.equal(g.gameState,'showdown');assert.ok(g.scheduledAction.due-started>=4000&&g.scheduledAction.due-started<4100);
   assert.ok(g.toJSON('a').next_hand_remaining_ms>0);g.advanceDueAction(g.scheduledAction.due);assert.equal(g.handNumber,2);
  }
 });
