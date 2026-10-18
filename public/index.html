@@ -327,6 +327,8 @@
             <button class="btn-gold" style="padding: 8px 12px; font-size: 0.8em;" onclick="setQuickBet(1/2)">1/2底池</button>
             <button class="btn-gold" style="padding: 8px 12px; font-size: 0.8em;" onclick="setQuickBet(2/3)">2/3底池</button>
             <button class="btn-gold" style="padding: 8px 12px; font-size: 0.8em;" onclick="setQuickBet(1)">滿底池</button>
+            <button class="btn-gold" style="padding: 8px 12px; font-size: 0.8em;" onclick="setQuickBet(2)">2倍底池</button>
+            <button class="btn-gold" style="padding: 8px 12px; font-size: 0.8em;" onclick="setQuickBet(3)">3倍底池</button>
             <button class="btn-gold" style="padding: 8px 12px; font-size: 0.8em;" onclick="setQuickBet('allin')">All In</button>
         </div>
             <div style="display: flex; gap: 5px; justify-content: center; width: 100%; margin-top: 5px;">
@@ -887,7 +889,7 @@
         }
 
         
-        async function setQuickBet(fraction) {
+        function setQuickBet(fraction) {
             let pot = window.currentPot || 0;
             let currentBet = window.currentBetAmount || 0;
             let myChips = window.myChips || 0;
@@ -908,16 +910,14 @@
             const input = document.getElementById('raiseAmount');
             input.value = amount;
             input.blur();
-            if (fraction === 'allin' && amount <= currentBet) return performAction('call');
-            await performAction('raise', amount);
         }
 
         let actionSubmissionBusy = false;
-        async function performAction(action, specifiedAmount = null) {
+        async function performAction(action) {
             if (actionSubmissionBusy) return;
             let amount = 0;
             if (action === 'raise') {
-                amount = specifiedAmount === null ? Math.round(parseFloat(document.getElementById('raiseAmount').value)) : specifiedAmount;
+                amount = Math.round(parseFloat(document.getElementById('raiseAmount').value));
                 if (!amount || amount <= 0) return alert('請輸入加注金額');
             }
             actionSubmissionBusy = true;

@@ -1,14 +1,22 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
-const fs=require('node:fs'),path=require('node:path');
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 
-test('pot shortcuts submit immediately without focusing the numeric keyboard',()=>{
+test('all seven bet shortcuts fill an editable amount without submitting or opening the numeric keyboard',()=>{
  const html=fs.readFileSync(path.join(__dirname,'../public/index.html'),'utf8');
- const quick=html.match(/async function setQuickBet[\s\S]*?\n        }/)?.[0]||'';
- assert.match(quick,/await performAction\('raise', amount\)/);
- assert.match(quick,/fraction === 'allin'.*performAction\('call'\)/);
- assert.match(quick,/\.blur\(\)/);
- assert.doesNotMatch(quick,/\.focus\(\)/);
+ const quick=html.match(/function setQuickBet[\s\S]*?\n        }/)?.[0]||'';
+ const input={value:'',blur(){this.blurred=true;},focus(){assert.fail('a shortcut must not focus the numeric input');}};
+ const context={window:{currentPot:600,currentBetAmount:100,myChips:5000,myCurrentBet:40,minRaise:200},document:{getElementById(id){assert.equal(id,'raiseAmount');return input;}},performAction(){assert.fail('a shortcut must not submit an action');}};
+ vm.runInNewContext(quick,context);
+ for(const [fraction,amount] of [[1/3,320],[1/2,430],[2/3,540],[1,760],[2,1420],[3,2080],['allin',5040]]){
+  context.setQuickBet(fraction);assert.equal(input.value,amount);assert.equal(input.blurred,true);
+ }
+ context.window.currentBetAmount=0;context.window.myCurrentBet=0;context.setQuickBet(2);assert.equal(input.value,1200);
+ context.window.currentPot=30;context.setQuickBet(1/3);assert.equal(input.value,200,'respect the minimum raise');
+ context.window.myChips=150;context.setQuickBet(3);assert.equal(input.value,150,'cap a selected size at the available stack');
+ context.window.currentBetAmount=500;context.setQuickBet('allin');assert.equal(input.value,150,'a short all-in selection must not send a call');
+ assert.match(html,/onclick="setQuickBet\(2\)">2倍底池/);assert.match(html,/onclick="setQuickBet\(3\)">3倍底池/);
+ assert.match(html,/<input type="number" id="raiseAmount"[^>]*inputmode="numeric"/);
 });
 
 test('each state update restores fold availability after a pending action',()=>{
