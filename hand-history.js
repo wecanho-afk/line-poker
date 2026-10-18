@@ -21,14 +21,20 @@ function begin(game) {
         gameId: game.gameId, blinds: clone(game.blinds), scenario: game.practice ? { id: game.practice.id, title: game.practice.title } : null,
         seats: game.activePlayersInRound.map(id => ({ id, name: game.players[id].name, chips: game.players[id].chips + game.players[id].invested,
             hand: game.players[id].hand.map(c => c.toString()), bot: game.players[id].isBot })), actions: [], finished: false };
+    strategy.beginHand(game);
 }
 function capture(game, player, action, amount) {
     const c = strategy.context(game, player);
     return { playerId: player.userId, name: player.name, street: game.gameState, board: c.board, pot: c.pot,
-        stack: c.stack, call: c.call, position: c.positionLabel, action, display_action: action === 'raise' && game.currentBetAmount === 0 ? 'bet' : action, amount: action === 'raise' ? amount : action === 'call' ? c.call : 0,
+        stack: c.stack, call: c.call, bet: c.bet, position: c.positionLabel, action, display_action: action === 'raise' && game.currentBetAmount === 0 ? 'bet' : action, amount: action === 'raise' ? amount : action === 'call' ? c.call : 0,
         context: player.isBot ? null : c };
 }
-function record(game, event) { if (game.currentHand && !game.currentHand.finished) game.currentHand.actions.push(event); }
+function record(game, event) {
+    if (game.currentHand && !game.currentHand.finished) {
+        game.currentHand.actions.push(event);
+        strategy.observe(game, event);
+    }
+}
 function finish(game) {
     const hand = game.currentHand;
     if (!hand || hand.finished) return;

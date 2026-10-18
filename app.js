@@ -908,7 +908,7 @@ class TexasHoldemGame {
     makeBotDecision(bot) {
         if (!['pre_flop', 'flop', 'turn', 'river'].includes(this.gameState) || bot.allIn || bot.folded) return;
         
-        // Use GTO logic for decision
+        // Public-action opponent ranges and stack-aware decisions.
         let decision;
         try { decision = PokerBotGTO.decide(this, bot); }
         catch (error) {

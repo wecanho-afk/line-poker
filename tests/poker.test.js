@@ -98,4 +98,31 @@ test('full simulated hands terminate and conserve chips',()=>{
   assert.ok(actions<150);assert.equal(Object.values(g.players).reduce((n,p)=>n+p.chips,0),total);
  }
 });
+test('seeded two, six and eight-seat bot tables complete successive hands with legal actions and conserved buy-ins',()=>{
+ const originalRandom=Math.random;Math.random=strategy.seeded('upgraded-bot-tables');
+ try{
+  for(const seats of [2,6,8]){
+   const g=new TexasHoldemGame('bots-'+seats,'hero','Hero',2000);
+   for(let i=1;i<seats;i++)assert.equal(g.addBot()[0],true);
+   g.playersOrder.forEach((id,i)=>{g.players[id].isBot=true;g.players[id].personality=strategy.personality(strategy.profiles[i%strategy.profiles.length].key);});
+   g.startGame();
+   for(let hand=0;hand<5;hand++){
+    let steps=0;
+    while(['pre_flop','flop','turn','river'].includes(g.gameState)&&steps++<250){
+     if(g.runoutDecision||g.scheduledAction?.kind==='runout'){g.advanceDueAction(Infinity);continue;}
+     const actor=g.getCurrentPlayer();
+     if(!actor?.canBet()){g.endBettingRound();continue;}
+     const decision=strategy.decide(g,actor);
+     assert.equal(g.playerAction(actor.userId,decision.action,decision.amount)[0],true,JSON.stringify({seats,hand,decision}));
+    }
+    assert.ok(steps<250);assert.equal(g.gameState,'showdown');assert.equal(g.assertCardIntegrity(),true);
+    assert.equal(Object.values(g.players).reduce((n,p)=>n+p.chips,0),Object.values(g.players).reduce((n,p)=>n+p.totalBuyIn,0));
+    g.cancelScheduledAction();
+    if(hand<4){g.prepareNext();g.startNewRound();}
+   }
+   g.cancelScheduledAction();
+  }
+ }finally{Math.random=originalRandom;}
+});
+
 after(()=>{timers.forEach(clearTimeout);global.setTimeout=originalTimeout;io.close();server.close();fs.rmSync(process.env.POKER_HISTORY_DIR,{recursive:true,force:true});});
