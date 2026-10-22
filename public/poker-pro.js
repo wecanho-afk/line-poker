@@ -1,5 +1,5 @@
 const actionLabels = { fold:'棄牌', check:'過牌', call:'跟注', raise:'加注 Raise 至', bet:'下注 Bet' };
-const streetLabels = { pre_flop:'翻牌前', flop:'翻牌', turn:'轉牌', river:'河牌', showdown:'攤牌', waiting_for_players:'等待入座', waiting_for_next_round:'本手結束', game_over:'牌局結束' };
+const streetLabels = { pre_flop:'翻牌前', flop:'翻牌', turn:'轉牌', river:'河牌', showdown:'攤牌', slot_announcement:'拉霸局公告', waiting_for_players:'等待入座', waiting_for_next_round:'本手結束', game_over:'牌局結束' };
 let proState = null, proView = 'table', reviewHands = [], selectedHand = 0, selectedStep = 0;
 let historyKey;
 const handSaveStates = new Map();
@@ -72,10 +72,13 @@ catch { historyKey = createHistoryKey(); }
 function escapeHTML(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function proUpdate(state) {
     proState = state;
+    document.body.classList.toggle('slot-hand',!!state.slot_hand);
     updateHandSaveStatus(state);
     document.body.classList.toggle('playing', proView === 'table');
-    const handProgress=state.hand_limit?`第 ${state.hand_number || 0} / ${state.hand_limit} 手`:`第 ${state.hand_number || 0} 手`;
-    document.getElementById('table-meta').textContent = `${handProgress}　 •　 ${streetLabels[state.game_state] || state.game_state}　 •　 盲注 ${state.blinds?.small || 0} / ${state.blinds?.big || 0}`;
+    const displayHandNumber=(state.hand_number||0)+(state.game_state==='slot_announcement'?1:0);
+    const handProgress=state.hand_limit?`第 ${displayHandNumber} / ${state.hand_limit} 手`:`第 ${displayHandNumber} 手`;
+    const slotLabel=state.slot_hand?`　 •　 🎰 雙牌面拉霸局 · 每人 ${state.slot_forced_bet}（4BB）`:state.slot_interval?`　 •　 🎰 每 ${state.slot_interval} 手`:'';
+    document.getElementById('table-meta').textContent = `${handProgress}　 •　 ${streetLabels[state.game_state] || state.game_state}　 •　 盲注 ${state.blinds?.small || 0} / ${state.blinds?.big || 0}${slotLabel}`;
     const banner = document.getElementById('practice-context');
     banner.hidden = !state.practice;
     banner.textContent = state.practice ? `${state.practice.title}｜${state.practice.prompt}${state.practice.lesson ? '　解析：' + state.practice.lesson : ''}` : '';

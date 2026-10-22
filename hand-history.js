@@ -19,6 +19,7 @@ function read(id) {
 function begin(game) {
     game.currentHand = { id: randomUUID(), number: game.handNumber || 1, started: new Date().toISOString(),
         gameId: game.gameId, blinds: clone(game.blinds), scenario: game.practice ? { id: game.practice.id, title: game.practice.title } : null,
+        variant: game.isSlotHand ? { key:'slot_double_board', label:'雙牌面拉霸局', forcedBet:game.blinds.big*4 } : null,
         seats: game.activePlayersInRound.map(id => ({ id, name: game.players[id].name, chips: game.players[id].chips + game.players[id].invested,
             hand: game.players[id].hand.map(c => c.toString()), bot: game.players[id].isBot })), actions: [], finished: false };
     strategy.beginHand(game);
@@ -41,7 +42,7 @@ function finish(game) {
     hand.finished = true;
     game.historyError = false;
     for (const seat of hand.seats.filter(p => !p.bot)) {
-        const review = { id: hand.id, number: hand.number, started: hand.started, gameId: hand.gameId, scenario: hand.scenario,
+        const review = { id: hand.id, number: hand.number, started: hand.started, gameId: hand.gameId, scenario: hand.scenario, variant: hand.variant,
             hand: seat.hand, board: game.communityCards.map(c => c.toString()), boards: game.runoutBoards?.length===2?game.runoutBoards.map(board=>board.map(String)):null, blinds: hand.blinds,
             pot: game.pot, net: game.players[seat.id].chips - seat.chips, winners: game.winners.map(id => game.players[id].name),
             actions: hand.actions.map(event => {

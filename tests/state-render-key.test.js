@@ -18,6 +18,6 @@ test('visible game changes always produce a new render key',()=>{
   state({pot:500}),state({action_count:5}),state({current_player_id:'villain'}),
   state({community_cards:['As','Kh','2c','Td']}),
   state({players:[{...original.players[0],chips:800}]}),
-  state({next_hand_remaining_ms:3900})
+  state({next_hand_remaining_ms:3900}),state({slot_hand:true,slot_interval:5,slot_forced_bet:400})
  ]) assert.notEqual(stateRenderKey(original),stateRenderKey(changed));
 });

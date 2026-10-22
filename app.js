@@ -249,10 +249,12 @@ class TournamentManager {
 }
 
 class TexasHoldemGame {
-    constructor(gameId, hostUserId, hostName, initialChips = 1000, gameMode = "cash", smallBlind = 10, blindDuration = 600, maxReEntry = 2, cashHandLimit = null) {
+    constructor(gameId, hostUserId, hostName, initialChips = 1000, gameMode = "cash", smallBlind = 10, blindDuration = 600, maxReEntry = 2, cashHandLimit = null, slotInterval = 0) {
         this.gameId = gameId;
         this.gameMode = gameMode;
         this.cashHandLimit = gameMode === 'cash' && Number.isSafeInteger(cashHandLimit) && cashHandLimit > 0 ? cashHandLimit : null;
+        this.slotInterval = gameMode === 'cash' && Number.isSafeInteger(slotInterval) && slotInterval > 0 ? slotInterval : 0;
+        this.isSlotHand = false;
         
         const sbMults = [1, 1.5, 2, 3, 4, 6, 8, 10, 15, 20, 30, 40, 60, 80, 120, 160, 200, 300, 400, 600];
         const anteMults = [0, 0, 0.5, 0.5, 1, 1.5, 2, 2, 3, 4, 6, 8, 10, 15, 20, 30, 40, 60, 80, 100];
@@ -411,9 +413,22 @@ class TexasHoldemGame {
         return [true, "遊戲已開始"];
     }
 
-    startNewRound() {
-        if (!['waiting_for_players', 'waiting_for_next_round', 'game_over'].includes(this.gameState)) return;
+    startNewRound(skipSlotAnnouncement = false) {
+        const allowedStates = ['waiting_for_players', 'waiting_for_next_round', 'game_over'];
+        if (skipSlotAnnouncement) allowedStates.push('slot_announcement');
+        if (!allowedStates.includes(this.gameState)) return;
         if (this.cashHandLimit && this.handNumber >= this.cashHandLimit) { this.gameState = 'game_over'; return; }
+        const nextHandIsSlot = this.gameMode === 'cash' && this.slotInterval > 0 && (this.handNumber + 1) % this.slotInterval === 0;
+        if (nextHandIsSlot && !skipSlotAnnouncement) {
+            this.isSlotHand = true;
+            this.gameState = 'slot_announcement';
+            this.messages.push(`🎰 下一手為雙牌面拉霸局：每位玩家將投入 ${this.blinds.big * 4}（4BB）`);
+            this.actionCount++;
+            this.scheduleAction('slot_start', 2500);
+            broadcastState(this.gameId);
+            return;
+        }
+        this.isSlotHand = false;
         this.cancelScheduledAction();
         this.deck = new Deck();
         this.communityCards = [];
@@ -455,6 +470,7 @@ class TexasHoldemGame {
         }
 
         this.handNumber += 1;
+        this.isSlotHand = this.gameMode === 'cash' && this.slotInterval > 0 && this.handNumber % this.slotInterval === 0;
 
         // Advance Dealer
         this.dealerPos = (this.dealerPos + 1) % this.playersOrder.length;
@@ -494,13 +510,35 @@ class TexasHoldemGame {
         });
         this.activePlayersInRound.forEach(id => { if (this.players[id].personality) this.players[id].personality.handsPlayed++; });
 
-        // Post Blinds
+        this.messages.push(`莊家: ${this.players[this.dealerId].name}`);
+
+        if (this.isSlotHand) {
+            const forcedAmount = this.blinds.big * 4;
+            this.activePlayersInRound.forEach(id => this.postForcedContribution(this.players[id], forcedAmount));
+            this.runoutCount = 2;
+            this.runoutSharedCount = 0;
+            this.runoutBoards = [this.deck.deal(3), this.deck.deal(3)];
+            this.communityCards = [...this.runoutBoards[0]];
+            this.gameState = 'flop';
+            this.currentBetAmount = 0;
+            this.lastRaiseAmount = this.blinds.big;
+            this.assertCardIntegrity();
+            this.messages.push(`🎰 雙牌面拉霸局：每位玩家投入 ${forcedAmount}（4BB），發出兩組翻牌`);
+
+            // This variant explicitly starts its first betting round at the small blind.
+            const smallBlindIndex = this.activePlayersInRound.indexOf(this.smallBlindId);
+            this.currentPlayerIdx = (smallBlindIndex - 1 + this.activePlayersInRound.length) % this.activePlayersInRound.length;
+            if (!this.moveToNextPlayer()) { this.endBettingRound(); return; }
+            this.messages.push(`現在輪到 ${this.getCurrentPlayer().name} 行動。`);
+            this.startTurnTimer();
+            return;
+        }
+
+        // Standard hand blinds.
         this.postBlind(this.players[this.smallBlindId], this.blinds.small);
         this.postBlind(this.players[this.bigBlindId], this.blinds.big);
         this.currentBetAmount = this.blinds.big;
         this.lastRaiseAmount = this.blinds.big; // 翻牌前的最低加注增量是一次大盲
-
-        this.messages.push(`莊家: ${this.players[this.dealerId].name}`);
 
         // Pre-flop: Action starts left of BB (UTG)
         this.currentPlayerIdx = this.activePlayersInRound.indexOf(this.bigBlindId);
@@ -518,6 +556,15 @@ class TexasHoldemGame {
         this.pot += bet;
         if (player.chips === 0) player.allIn = true;
         this.messages.push(`${player.name} 下注 $${bet} (盲注)`);
+    }
+
+    postForcedContribution(player, amount) {
+        const contribution = Math.min(amount, player.chips);
+        player.chips -= contribution;
+        player.invested += contribution;
+        this.pot += contribution;
+        if (player.chips === 0) player.allIn = true;
+        this.messages.push(`${player.name} 投入 $${contribution} (拉霸局 4BB)`);
     }
 
     getCurrentPlayer() {
@@ -651,7 +698,7 @@ class TexasHoldemGame {
         this.communityCards=[...this.runoutBoards[0]];
         this.assertCardIntegrity();
         this.gameState=target===3?'flop':target===4?'turn':'river';
-        this.messages.push(this.runoutCount===2?`兩次發牌進行至${target===3?'翻牌':target===4?'轉牌':'河牌'}`:`發出${target===3?'翻牌':target===4?'轉牌':'河牌'}`);
+        this.messages.push(this.isSlotHand?`雙牌面拉霸局進行至${target===3?'翻牌':target===4?'轉牌':'河牌'}`:this.runoutCount===2?`兩次發牌進行至${target===3?'翻牌':target===4?'轉牌':'河牌'}`:`發出${target===3?'翻牌':target===4?'轉牌':'河牌'}`);
         if(target===5)this.determineWinner();else this.scheduleAction('runout',900);
     }
 
@@ -711,7 +758,14 @@ class TexasHoldemGame {
 
         const canActCount = this.activePlayersInRound.filter(id => !this.players[id].allIn).length;
         if (canActCount <= 1 && this.communityCards.length < 5) {
-            this.beginRunoutDecision();
+            if (this.isSlotHand) {
+                this.revealRunoutHands = !this.hasContestableSidePot();
+                this.runoutCount = 2;
+                this.turnDeadline = 0;
+                this.scheduleAction('runout', 900);
+            } else {
+                this.beginRunoutDecision();
+            }
             return;
         }
 
@@ -722,14 +776,24 @@ class TexasHoldemGame {
             this.messages.push(`發出翻牌`);
         } else if (this.gameState === 'flop') {
             this.gameState = 'turn';
-            this.communityCards.push(...this.deck.deal(1));
+            if (this.isSlotHand) {
+                this.runoutBoards.forEach(board => board.push(...this.deck.deal(1)));
+                this.communityCards = [...this.runoutBoards[0]];
+            } else {
+                this.communityCards.push(...this.deck.deal(1));
+            }
             this.assertCardIntegrity();
-            this.messages.push(`發出轉牌`);
+            this.messages.push(this.isSlotHand ? `兩個牌面發出轉牌` : `發出轉牌`);
         } else if (this.gameState === 'turn') {
             this.gameState = 'river';
-            this.communityCards.push(...this.deck.deal(1));
+            if (this.isSlotHand) {
+                this.runoutBoards.forEach(board => board.push(...this.deck.deal(1)));
+                this.communityCards = [...this.runoutBoards[0]];
+            } else {
+                this.communityCards.push(...this.deck.deal(1));
+            }
             this.assertCardIntegrity();
-            this.messages.push(`發出河牌`);
+            this.messages.push(this.isSlotHand ? `兩個牌面發出河牌` : `發出河牌`);
         } else if (this.gameState === 'river') {
             this.determineWinner();
             return;
@@ -881,6 +945,7 @@ class TexasHoldemGame {
             this.prepareNext();
             if (this.gameState === 'waiting_for_next_round' && !this.practice) this.startNewRound();
         }
+        else if (pending.kind === 'slot_start') this.startNewRound(true);
         else if (pending.kind === 'runout') this.advanceRunout();
         else if (pending.kind === 'runout_choice') {
             const runs=this.runoutDecision?.stage==='decision'?(this.runoutDecision.proposedRuns||1):(this.players[pending.playerId]?.isBot?2:1);
@@ -1110,7 +1175,8 @@ class TexasHoldemGame {
                 potWinners.sort((a,b)=>((this.playersOrder.indexOf(a.userId)-this.dealerPos-1+this.playersOrder.length)%this.playersOrder.length)-((this.playersOrder.indexOf(b.userId)-this.dealerPos-1+this.playersOrder.length)%this.playersOrder.length));
                 potWinners.forEach(w=>{const award=share+(remainder-->0?1:0);winnings.set(w,(winnings.get(w)||0)+award);boardWinnings.set(w,(boardWinnings.get(w)||0)+award);if(!winnersList.includes(w))winnersList.push(w);});
             }
-            boardMessages.push(`${boards.length===2?`第 ${boardIndex+1} 次：`:''}${[...boardWinnings].map(([w,amount])=>`${w.name} (${playerScores.get(w).desc}) 贏得 ${amount}`).join(', ')}`);
+            const boardLabel=boards.length===2?(this.isSlotHand?`牌面 ${boardIndex+1}：`:`第 ${boardIndex+1} 次：`):'';
+            boardMessages.push(`${boardLabel}${[...boardWinnings].map(([w,amount])=>`${w.name} (${playerScores.get(w).desc}) 贏得 ${amount}`).join(', ')}`);
         });
         this.winners=winnersList.map(w=>w.userId);
         for(const [winner,amount] of winnings)winner.chips+=amount;
@@ -1211,6 +1277,7 @@ class TexasHoldemGame {
             snapshot_version: this.snapshotVersion,
             viewer_id: userId,
             next_hand_remaining_ms: this.scheduledAction?.kind === 'next' && !this.practice ? Math.max(0, this.scheduledAction.due - serverTime) : 0,
+            slot_announcement_remaining_ms: this.scheduledAction?.kind === 'slot_start' ? Math.max(0, this.scheduledAction.due - serverTime) : 0,
             host_user_id: this.getHostId(),
             hand_number: this.handNumber || 0,
             blinds: this.blinds,
@@ -1220,6 +1287,9 @@ class TexasHoldemGame {
             game_id: this.gameId,
             game_mode: this.gameMode,
             hand_limit: this.cashHandLimit,
+            slot_interval: this.slotInterval,
+            slot_hand: this.isSlotHand,
+            slot_forced_bet: this.isSlotHand ? this.blinds.big * 4 : 0,
             cash_settlement: cashSettlement,
             rebuy_default: this.initialChips,
             game_state: this.gameState,
@@ -1295,13 +1365,15 @@ class TexasHoldemGame {
 const GAMES = {};
 
 app.post('/create_game', (req, res) => {
-    const { user_id, user_name, initial_chips, avatar, game_mode, small_blind, blind_duration, max_re_entry, cash_hand_limit } = req.body;
+    const { user_id, user_name, initial_chips, avatar, game_mode, small_blind, blind_duration, max_re_entry, cash_hand_limit, slot_interval } = req.body;
     const chips = parseInt(initial_chips) || 1000;
     const mode = game_mode || 'cash';
     const handLimit = mode === 'cash' ? Number(cash_hand_limit) : null;
     if (mode === 'cash' && (!Number.isSafeInteger(handLimit) || handLimit < 1 || handLimit > 1000)) return res.status(400).json({success:false,message:'現金局手數必須是 1～1000 的整數'});
+    const slotInterval = mode === 'cash' ? (slot_interval === undefined || slot_interval === null || slot_interval === '' ? 0 : Number(slot_interval)) : 0;
+    if (mode === 'cash' && (!Number.isSafeInteger(slotInterval) || slotInterval < 0 || slotInterval > 1000)) return res.status(400).json({success:false,message:'拉霸局頻率必須是 0～1000 的整數'});
     const gameId = Math.random().toString(36).substr(2, 8).toUpperCase();
-    GAMES[gameId] = new TexasHoldemGame(gameId, user_id, user_name, chips, mode, parseInt(small_blind) || 10, parseInt(blind_duration) || 600, parseInt(max_re_entry) ?? 2, handLimit);
+    GAMES[gameId] = new TexasHoldemGame(gameId, user_id, user_name, chips, mode, parseInt(small_blind) || 10, parseInt(blind_duration) || 600, parseInt(max_re_entry) ?? 2, handLimit, slotInterval);
     GAMES[gameId].players[user_id].historyKey = req.get('X-History-Key') || '';
     if (avatar) GAMES[gameId].players[user_id].avatar = avatar;
     res.json({ success: true, game_id: gameId, game_state: GAMES[gameId].toJSON(user_id) });

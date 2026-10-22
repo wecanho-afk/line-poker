@@ -8,7 +8,7 @@
   let handKey='',seen=new Set(),tense=false,hideTimer,celebrationTimer,premiumHands=new Set(),lastStrengthEvent='';
   const music=PokerMusicPlayer.create(button);
   function setMode(mode){music.setMode(mode);}
-  function clearEffect(){clearTimeout(hideTimer);banner.hidden=true;document.getElementById('poker-table').classList.remove('allin-impact');}
+  function clearEffect(){clearTimeout(hideTimer);banner.hidden=true;banner.classList.remove('slot-announcement');document.getElementById('poker-table').classList.remove('allin-impact');}
   function celebrate(analysis){
     clearTimeout(celebrationTimer);celebration.hidden=false;celebration.dataset.tier=analysis.tier;
     celebration.querySelector('span').textContent=analysis.headline;celebration.querySelector('strong').textContent=analysis.label;
@@ -23,6 +23,9 @@
     if(analysis)strength.querySelector('strong').textContent=analysis.label;
     const key=state.game_id+':'+state.hand_number;
     if(key!==handKey){handKey=key;seen=new Set();tense=false;lastStrengthEvent='';clearEffect();clearTimeout(celebrationTimer);celebration.hidden=true;setMode('normal');}
+    if(state.game_state==='slot_announcement'&&proView==='table'){
+      clearEffect();banner.classList.add('slot-announcement');banner.textContent=`🎰 拉霸模式即將開始\n本手每位玩家收取 ${state.slot_forced_bet}（4BB）· 發兩組翻牌`;banner.hidden=false;
+    }
     if(!premiumHands.has(key)&&proView==='table'&&PokerHandStrength.isPremiumStartingHand(me?.hand)){
       premiumHands.add(key);if(premiumHands.size>20)premiumHands.delete(premiumHands.values().next().value);
       const cards=document.querySelector('.poker-table .seat-0 .player-cards');

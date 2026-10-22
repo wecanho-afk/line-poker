@@ -138,7 +138,8 @@ function context(game, player) {
     }));
     const preflop = actions.filter(e => e.street === 'pre_flop'), street = actions.filter(e => e.street === game.gameState);
     const ownIndex = actionOrder.indexOf(id);
-    return { hand: player.hand.map(cardText), board: game.communityCards.map(cardText), street: game.gameState,
+    const boards=game.runoutBoards?.length===2?game.runoutBoards.map(board=>board.map(cardText)):[game.communityCards.map(cardText)];
+    return { hand: player.hand.map(cardText), board: boards[0], boards, street: game.gameState,
         position: actionOrder.length < 2 ? .5 : Math.max(0, ownIndex) / (actionOrder.length - 1),
         positionLabel: id === game.dealerId ? 'BTN' : id === game.smallBlindId ? 'SB' : id === game.bigBlindId ? 'BB' : '其他位置',
         inPosition: opponents.every(o => actionOrder.indexOf(o.id) < ownIndex),
@@ -187,7 +188,8 @@ function rangeWeight(hand, c, opponent, feature) {
 // unknown board. Actual opponents' cards and the live deck are never consulted.
 function equity(c, iterations = c.opponents.length > 2 ? 128 : 192) {
     if (!c.opponents.length) return 1;
-    const known = new Set([...c.hand, ...c.board]);
+    const boardTemplates=Array.isArray(c.boards)&&c.boards.length?c.boards:[c.board];
+    const known = new Set([...c.hand, ...boardTemplates.flat()]);
     const deck = [...ranks].flatMap(r => [...'shdc'].map(s => r + s)).filter(x => !known.has(x));
     const random = seeded(JSON.stringify(c)), features = new Map();
     const feature = (hand, board) => {
@@ -214,20 +216,27 @@ function equity(c, iterations = c.opponents.length > 2 ? 128 : 192) {
         return [a, remaining[Math.floor(random() * remaining.length)]];
     };
     let wins = 0;
-    const riverHero = c.board.length === 5 ? Hand.solve([...c.hand, ...c.board]) : null;
     for (let i = 0; i < iterations; i++) {
         const used = new Set(), hands = ranges.map(range => { const hand = pick(range, used); hand.forEach(card => used.add(card)); return hand; });
-        const available = deck.filter(card => !used.has(card)), board = c.board.slice();
-        while (board.length < 5) board.push(available.splice(Math.floor(random() * available.length),1)[0]);
-        const hero = riverHero || Hand.solve([...c.hand,...board]), villains = hands.map(hand => Hand.solve([...hand,...board]));
-        const pots = c.call > 0 && c.pots?.length ? c.pots : [{amount:1,opponents:villains.map((_,j) => j)}];
-        let payout = 0, total = 0;
-        for (const pot of pots) {
-            const best = Hand.winners([hero, ...pot.opponents.map(j => villains[j])]);
-            if (best.includes(hero)) payout += pot.amount / best.length;
-            total += pot.amount;
+        const available = deck.filter(card => !used.has(card));
+        const completedBoards=boardTemplates.map(template=>{
+            const board=template.slice();
+            while(board.length<5)board.push(available.splice(Math.floor(random()*available.length),1)[0]);
+            return board;
+        });
+        const pots = c.call > 0 && c.pots?.length ? c.pots : [{amount:1,opponents:hands.map((_,j) => j)}];
+        let boardEquity=0;
+        for(const board of completedBoards){
+            const hero=Hand.solve([...c.hand,...board]),villains=hands.map(hand=>Hand.solve([...hand,...board]));
+            let payout=0,total=0;
+            for (const pot of pots) {
+                const best = Hand.winners([hero, ...pot.opponents.map(j => villains[j])]);
+                if (best.includes(hero)) payout += pot.amount / best.length;
+                total += pot.amount;
+            }
+            boardEquity+=payout/Math.max(1,total);
         }
-        wins += payout / Math.max(1,total);
+        wins+=boardEquity/completedBoards.length;
     }
     return wins / iterations;
 }

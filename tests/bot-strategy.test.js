@@ -68,6 +68,13 @@ test('side-pot equity weighs each eligible pot against its own contenders',()=>{
     assert.equal(short.pots.reduce((n,p)=>n+p.amount,0),550);
 });
 
+test('double-board equity uses both public boards and excludes all exposed cards',()=>{
+    const c=situation({hand:['As','Kd'],board:['Qh','Jh','Th','2d','3c'],boards:[['Qh','Jh','Th','2d','3c'],['4s','4c','4d','5h','5c']],street:'river',call:0,target:0,bet:0});
+    const both=s.equity(c,128),firstOnly=s.equity({...c,boards:[c.board]},128);
+    assert.ok(both<firstOnly,'the paired second board must affect the combined equity');
+    assert.equal(both,s.equity(c,128),'public double-board sampling stays deterministic');
+});
+
 test('short-stack openings shove a playable range and fold trash without risking unmatched stacks',()=>{
     assert.deepEqual(s.policy(situation({hand:['As','5s']}),.57,regular,()=>0),{action:'raise',amount:1000});
     assert.equal(s.policy(situation({hand:['7s','2d']}),.35,regular,()=>0).action,'fold');

@@ -19,7 +19,7 @@
     ]);
     return JSON.stringify([
       state.game_id, state.hand_number, state.game_state, state.game_mode, state.hand_limit,
-      state.blinds, state.rebuy_default,
+      state.blinds, state.rebuy_default, state.slot_interval, state.slot_hand, state.slot_forced_bet,
       state.pot, state.current_bet_amount, state.min_raise, state.current_player_id,
       state.action_count, state.latest_voice, state.turn_id, state.turn_deadline,
       Math.ceil((state.next_hand_remaining_ms || 0) / 1000), state.host_user_id,

@@ -268,6 +268,7 @@
 <input type="number" id="initialChipsInput" placeholder="初始籌碼" value="1000">
                     <input type="number" id="smallBlindInput" placeholder="初始小盲注 (預設10)" value="10">
                     <label id="cashHandLimitField" class="cash-hand-limit"><span>現金局手數</span><input type="number" id="cashHandLimitInput" aria-label="現金局總手數" value="50" min="1" max="1000" step="1"></label>
+                    <label id="slotIntervalField" class="cash-hand-limit" title="0 代表關閉；觸發時每人投入 4BB，直接進入雙牌面翻牌圈"><span>🎰 拉霸局每 X 手</span><small>0 關閉 · 每人 4BB · 兩組翻牌</small><input type="number" id="slotIntervalInput" aria-label="雙牌面拉霸局觸發間隔，0 為關閉" value="0" min="0" max="1000" step="1"></label>
                     <input type="number" id="blindDurationInput" placeholder="升盲時間(秒, 預設600)" value="600" style="display: none;" id="durationWrapper">
                     <input type="number" id="maxReEntryInput" placeholder="重買次數 (預設2, 0為凍結賽)" value="2" style="display: none;">
                     <button class="btn-blue" onclick="createGame()">建立新遊戲房</button>
@@ -786,6 +787,8 @@
             if(reEntry) reEntry.style.display = e.target.value === 'tournament' ? 'inline-block' : 'none';
             const handLimit = document.getElementById('cashHandLimitField');
             if(handLimit) handLimit.style.display = e.target.value === 'cash' ? 'inline-block' : 'none';
+            const slotInterval = document.getElementById('slotIntervalField');
+            if(slotInterval) slotInterval.style.display = e.target.value === 'cash' ? 'inline-block' : 'none';
         });
 
         async function createGame() {
@@ -797,8 +800,10 @@
             const gameMode = document.getElementById('gameModeInput') ? document.getElementById('gameModeInput').value : 'cash';
             const cashHandLimit = Number(document.getElementById('cashHandLimitInput')?.value);
             if (gameMode === 'cash' && (!Number.isSafeInteger(cashHandLimit) || cashHandLimit < 1 || cashHandLimit > 1000)) return alert('現金局總手數請輸入 1～1000 的整數');
+            const slotInterval = Number(document.getElementById('slotIntervalInput')?.value || 0);
+            if (gameMode === 'cash' && (!Number.isSafeInteger(slotInterval) || slotInterval < 0 || slotInterval > 1000)) return alert('拉霸局頻率請輸入 0～1000 的整數；0 代表關閉');
 
-            const res = await api('/create_game', 'POST', { user_id: userId, user_name: customName, initial_chips: initialChips, avatar: userAvatar, game_mode: gameMode, cash_hand_limit: cashHandLimit, small_blind: document.getElementById('smallBlindInput')?.value, blind_duration: document.getElementById('blindDurationInput')?.value, max_re_entry: document.getElementById('maxReEntryInput')?.value });
+            const res = await api('/create_game', 'POST', { user_id: userId, user_name: customName, initial_chips: initialChips, avatar: userAvatar, game_mode: gameMode, cash_hand_limit: cashHandLimit, slot_interval: slotInterval, small_blind: document.getElementById('smallBlindInput')?.value, blind_duration: document.getElementById('blindDurationInput')?.value, max_re_entry: document.getElementById('maxReEntryInput')?.value });
             if (res.success) {
                 gameId = res.game_id;
                 isHost = true;

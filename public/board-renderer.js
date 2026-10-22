@@ -4,10 +4,11 @@
 
   function describe(state) {
     const twice = Array.isArray(state.runout_boards) && state.runout_boards.length === 2;
+    const slot = twice && !!state.slot_hand;
     const shared = twice ? Math.max(0, Math.min(5, Math.trunc(Number(state.runout_shared_count) || 0))) : 0;
     const common = twice ? state.runout_boards[0].slice(0, shared) : [];
     const rows = twice ? state.runout_boards.map(cards => cards.slice(shared, 5)) : [state.community_cards || []];
-    return { twice, shared, common, rows, columns: 5 - shared };
+    return { twice, slot, shared, common, rows, columns: 5 - shared };
   }
 
   function render(area, state, formatCard) {
@@ -20,7 +21,7 @@
       area.replaceChildren();
       area.classList.toggle('run-twice', view.twice);
       area.classList.toggle('has-common', view.shared > 0);
-      area.setAttribute('aria-label', view.twice ? '公共牌發兩次，共同牌只顯示一次' : '公共牌');
+      area.setAttribute('aria-label', view.slot ? '雙牌面拉霸局' : view.twice ? '公共牌發兩次，共同牌只顯示一次' : '公共牌');
       const slots = [];
       const makeSlot = (parent, key, animate) => {
         const slot = area.ownerDocument.createElement('div');
@@ -41,7 +42,7 @@
         if (view.twice) {
           row = area.ownerDocument.createElement('div'); row.className = 'runout-lane';
           const label = area.ownerDocument.createElement('b'); label.textContent = String(lane + 1);
-          label.setAttribute('aria-label', '第 ' + (lane + 1) + ' 次發牌'); row.append(label); branches.append(row);
+          label.setAttribute('aria-label', view.slot ? '牌面 ' + (lane + 1) : '第 ' + (lane + 1) + ' 次發牌'); row.append(label); branches.append(row);
         }
         for (let i = 0; i < view.columns; i++) {
           const key = (view.twice ? 'lane:' + lane + ':' : 'shared:') + (view.shared + i);

@@ -56,6 +56,7 @@ button:disabled { opacity:.44; }
 #setup-view .setup-field { font-size:11px;gap:8px; }
 .cash-hand-limit { flex-direction:column;align-items:stretch;justify-content:space-between;flex:1 1 110px;padding:0;background:none;border:0;color:var(--muted);font-size:11px; }
 .cash-hand-limit input { width:100%;text-align:left;min-width:0; }
+.cash-hand-limit small { color:#789489;font-size:9px;line-height:1.25; }
 .practice-shortcut { color:#d8bf90;border-color:#ffffff10;font-size:12px;font-weight:400; }
 /* Table frame and felt are built with light, grain and a stitched inner rail. */
 body.playing #game-view { max-width:1500px;grid-template-columns:minmax(0,1fr) 272px;gap:20px!important; }
@@ -202,3 +203,6 @@ dialog,.modal-content { box-shadow:0 25px 90px #0008,inset 0 1px #d2b98720; }dia
   .action-rail { padding:17px; }.rail-heading { padding-bottom:10px; }.primary-actions { grid-template-columns:repeat(3,minmax(0,1fr)); }.primary-actions button:first-child { grid-column:auto; }
 }
 @media(prefers-reduced-motion:reduce) { .turn-progress i { transition:none; } }
+body.slot-hand .table-meta { color:#e8c978;text-shadow:0 0 12px #d6a84a42; }
+body.slot-hand .poker-table { box-shadow:inset 0 0 58px #00120dc9,0 15px 34px #0008,0 0 0 2px #d2ac5242,0 0 28px #d2ac5224; }
+body.slot-hand .pot-text { border-color:#e2bf66;color:#ffe09a;box-shadow:0 0 15px #d3a13e3d; }
