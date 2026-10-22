@@ -77,10 +77,23 @@ test('a short 4BB contribution creates a safe side pot across both boards',()=>{
 
 test('all-in slot hands finish both boards without asking for a runout choice',()=>{
  const g=game('all-in-slot',2,1,50);g.startGame();beginSlot(g);
- assert.equal(g.runoutDecision,null);assert.equal(g.scheduledAction.kind,'runout');assert.deepEqual(g.runoutBoards.map(board=>board.length),[3,3]);
- while(g.scheduledAction?.kind==='runout'){g.scheduledAction.due=0;g.advanceDueAction();}
+ assert.equal(g.runoutDecision,null);assert.equal(g.scheduledAction.kind,'runout');assert.equal(g.revealRunoutHands,true);assert.deepEqual(g.runoutBoards.map(board=>board.length),[3,3]);
+ while(g.scheduledAction?.kind==='runout'){
+  for(const player of g.toJSON('spectator').players)assert.deepEqual(player.hand,g.players[player.user_id].hand.map(String));
+  g.scheduledAction.due=0;g.advanceDueAction();
+ }
  assert.equal(g.gameState,'showdown');assert.deepEqual(g.runoutBoards.map(board=>board.length),[5,5]);
  assert.equal(g.players.a.chips+g.players.b.chips,100);
+});
+
+test('an unmatched all-in remainder is not treated as a contestable side pot',()=>{
+ const g=game('unmatched-slot',2,1,50);g.players.b.chips=80;g.startGame();beginSlot(g);
+ assert.deepEqual([g.players.a.invested,g.players.b.invested],[50,80]);assert.equal(g.hasContestableSidePot(),false);assert.equal(g.revealRunoutHands,true);
+ while(g.scheduledAction?.kind==='runout'){
+  for(const player of g.toJSON('spectator').players)assert.deepEqual(player.hand,g.players[player.user_id].hand.map(String));
+  g.scheduledAction.due=0;g.advanceDueAction();
+ }
+ assert.equal(g.players.a.chips+g.players.b.chips,130);
 });
 
 test('the lobby explains and submits the optional cash-table mode',()=>{

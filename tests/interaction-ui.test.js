@@ -70,6 +70,8 @@ test('table reactions remain visible for four seconds in both script and animati
  const css=fs.readFileSync(path.join(__dirname,'../public/table-reactions.css'),'utf8');
  assert.match(script,/STICKER_VISIBLE_MS=4000/);assert.match(script,/reaction\.remove\(\),STICKER_VISIBLE_MS/);
  assert.match(css,/animation:sticker-pop 4s/);assert.doesNotMatch(css,/sticker-pop 2\.8s/);
+ assert.match(script,/rail\.insertBefore\(dialog/);assert.match(script,/dialog\.show\(\)/);assert.doesNotMatch(script,/dialog\.showModal\(\)/);
+ assert.match(css,/#sticker-dialog \{ position:relative/);assert.match(css,/order:1/);assert.match(css,/sticker-preview-open/);
 });
 
 test('the game sound toggle controls the local settled-pot chip cue',()=>{

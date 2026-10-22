@@ -656,7 +656,8 @@ class TexasHoldemGame {
         const eligibleSets=new Set();
         for(const level of levels){
             const eligible=investors.filter(p=>!p.folded&&p.invested>=level).map(p=>p.userId).sort();
-            if(eligible.length)eligibleSets.add(eligible.join('|'));
+            // A one-player remainder is uncalled money, not a side pot that can be contested.
+            if(eligible.length>=2)eligibleSets.add(eligible.join('|'));
         }
         return eligibleSets.size>1;
     }
