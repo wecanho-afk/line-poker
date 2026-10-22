@@ -10,7 +10,10 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
-const TABLE_STICKERS = new Set(['nice','wow','gg','laugh','cheer','thanks','coffee','fish']);
+const TABLE_STICKERS = new Set([
+    'nice','wow','gg','laugh','cheer','thanks','coffee','fish',
+    'hurry','sleepy','one_time','thinking','lucky','close','brutal','tilt'
+]);
 const STICKER_COOLDOWN_MS = 1500;
 const SHOWDOWN_REVEAL_MS = 4000;
 const LINE_CHANNEL_ID = process.env.LINE_CHANNEL_ID || '2010219463';

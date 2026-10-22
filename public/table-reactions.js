@@ -3,7 +3,9 @@
   const STICKER_VISIBLE_MS=4000;
   const stickers={
     nice:{emoji:'👏',label:'好牌'},wow:{emoji:'😲',label:'哇！'},gg:{emoji:'🤝',label:'GG'},laugh:{emoji:'😂',label:'笑死'},
-    cheer:{emoji:'🔥',label:'漂亮'},thanks:{emoji:'🙏',label:'謝啦'},coffee:{emoji:'☕',label:'想一下'},fish:{emoji:'🐟',label:'上鉤了'}
+    cheer:{emoji:'🔥',label:'漂亮'},thanks:{emoji:'🙏',label:'謝啦'},coffee:{emoji:'☕',label:'想一下'},fish:{emoji:'🐟',label:'上鉤了'},
+    hurry:{emoji:'⏩',label:'快點'},sleepy:{emoji:'😴',label:'要睡著了'},one_time:{emoji:'☝️',label:'就一次'},thinking:{emoji:'🤔',label:'讓我想想'},
+    lucky:{emoji:'🍀',label:'拜託中'},close:{emoji:'😅',label:'好險'},brutal:{emoji:'😭',label:'太狠了'},tilt:{emoji:'🤯',label:'上頭了'}
   };
   const button=document.createElement('button');button.id='sticker-toggle';button.type='button';button.className='btn-blue';button.textContent='☺ 互動貼圖';button.setAttribute('aria-haspopup','dialog');
   document.querySelector('.table-tools').prepend(button);

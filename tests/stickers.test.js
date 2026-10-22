@@ -24,6 +24,23 @@ test('fixed room stickers are broadcast with the authenticated seat identity',as
  const event=await received;assert.equal(event.id,'nice');assert.equal(event.user_id,'hero');assert.equal(typeof event.at,'number');
 });
 
+test('expanded table phrases are configured on both client and server',()=>{
+ const serverSource=fs.readFileSync(path.join(__dirname,'../app.js'),'utf8');
+ const clientSource=fs.readFileSync(path.join(__dirname,'../public/table-reactions.js'),'utf8');
+ for(const id of ['hurry','sleepy','one_time','thinking','lucky','close','brutal','tilt']){
+  assert.match(serverSource,new RegExp(`['"]${id}['"]`),`server: ${id}`);
+  assert.match(clientSource,new RegExp(`${id}:`),`client: ${id}`);
+ }
+ for(const label of ['快點','要睡著了','就一次'])assert.match(clientSource,new RegExp(label));
+});
+
+test('a newly added table phrase is accepted and broadcast',async()=>{
+ await new Promise(resolve=>setTimeout(resolve,1550));
+ const received=once(viewer,'table_sticker');
+ assert.equal((await emitAck(sender,'hurry')).success,true);
+ assert.equal((await received).id,'hurry');
+});
+
 test('unknown stickers and rapid spam are rejected',async()=>{
  assert.equal((await emitAck(sender,'<img src=x>')).success,false);
  assert.equal((await emitAck(sender,'wow')).success,false);

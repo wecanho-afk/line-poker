@@ -76,7 +76,8 @@ test('the game sound toggle controls the local settled-pot chip cue',()=>{
  const html=fs.readFileSync(path.join(__dirname,'../public/index.html'),'utf8');
  const pro=fs.readFileSync(path.join(__dirname,'../public/poker-pro.js'),'utf8');
  assert.match(html,/src="\/pot-sound\.js"/);assert.match(html,/PokerPotSound\?\.setEnabled\(gameVoiceEnabled\)/);
- assert.match(html,/function showGame\(\) \{\s*lastActionCount = -1;\s*window\.PokerPotSound\?\.enter\(gameId\)/);
+ assert.match(html,/function showGame\(\) \{\s*lastActionCount = -1;\s*lastRenderedStateKey = '';\s*window\.PokerPotSound\?\.enter\(gameId\)/);
+ assert.match(html,/PokerPotSound\?\.sync\(state\)/);
  assert.match(html,/utterance\.volume = \.85/);assert.doesNotMatch(html,/PokerAudioMix\?\.duck/);
  assert.match(pro,/PokerPotSound\?\.leave\(\);lastActionCount=-1/);
 });

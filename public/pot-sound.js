@@ -74,7 +74,8 @@
   window.PokerPotSound={
     setEnabled(value){enabled=!!value;if(enabled)ensureAudio();else stop();},
     enter(nextSession){if(nextSession!==sessionKey){sessionKey=nextSession||'';playedKey='';}ensureAudio();},
-    leave(){sessionKey='';playedKey='';discardAudio();}
+    leave(){sessionKey='';playedKey='';discardAudio();},
+    sync
   };
   const update=proUpdate;
   proUpdate=function(state){update(state);sync(state);};
