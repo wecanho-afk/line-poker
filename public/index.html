@@ -1029,8 +1029,9 @@
 
             // 更新玩家 (圓桌排列)
             const table = document.getElementById('poker-table');
-            // Remove old players
-            document.querySelectorAll('.player-seat').forEach(e => e.remove());
+            const seats = new Map(Array.from(table.querySelectorAll('.player-seat')).map(seat => [seat.dataset.playerId, seat]));
+            const seatedIds = new Set(state.players.map(player => player.user_id));
+            for (const [id, seat] of seats) if (!seatedIds.has(id)) { seat.remove(); delete knownPlayerCards[id]; }
 
             // 確保「自己」永遠在下方 (seat-0)
             let meIndex = state.players.findIndex(p => p.user_id === userId);
@@ -1053,25 +1054,37 @@
                 let relIndex = (i - meIndex + state.players.length) % state.players.length;
                 let seatNum = seatMapping[relIndex] !== undefined ? seatMapping[relIndex] : 0;
                 
-                const div = document.createElement('div');
-                div.className = `player-seat seat-${seatNum} ${p.is_current_player ? 'active' : ''}`;
-                div.dataset.playerId = p.user_id;
-                // Elevate z-index if this player has cards to show during showdown, or is active
-                if (p.is_current_player || (state.game_state === 'showdown' && !p.folded)) {
-                    div.style.zIndex = 30;
+                const div = seats.get(p.user_id) || document.createElement('div');
+                if (!div.dataset.playerId) {
+                    div.className = 'player-seat';
+                    div.dataset.playerId = p.user_id;
+                    div.innerHTML = '<div class="avatar-frame"></div><div class="player-info-box"></div>';
+                    table.appendChild(div);
                 }
+                if (div.dataset.seatNum !== String(seatNum)) {
+                    if (div.dataset.seatNum !== undefined) div.classList.remove('seat-' + div.dataset.seatNum);
+                    div.classList.add('seat-' + seatNum);
+                    div.dataset.seatNum = String(seatNum);
+                }
+                div.classList.toggle('active', !!p.is_current_player);
+                // Elevate z-index if this player has cards to show during showdown, or is active
+                div.style.zIndex = p.is_current_player || (state.game_state === 'showdown' && !p.folded) ? '30' : '';
                 
-                let cardsHtml = '';
-                if ((!p.folded || p.shown_card_indexes?.length || (p.user_id === userId && p.can_show_cards)) && p.hand && p.hand.length > 0) {
+                const visibleHand = (!p.folded || p.shown_card_indexes?.length || (p.user_id === userId && p.can_show_cards)) && p.hand?.length ? p.hand : [];
+                const cardsKey = handKey + ':' + visibleHand.join(',');
+                if (div.dataset.cardsKey !== cardsKey) {
                     const knownHand = knownPlayerCards[p.user_id] || [];
-                    const renderedHand = p.hand.map((c, idx) => {
+                    const renderedHand = visibleHand.map((c, idx) => {
                         const isNew = idx >= knownHand.length || knownHand[idx] !== c;
                         return formatCard(c, isNew);
                     }).join('');
-                    knownPlayerCards[p.user_id] = p.hand.slice();
-                    cardsHtml = `<div class="player-cards">${renderedHand}</div>`;
-                } else {
-                    knownPlayerCards[p.user_id] = [];
+                    knownPlayerCards[p.user_id] = visibleHand.slice();
+                    let cards = div.querySelector('.player-cards');
+                    if (visibleHand.length) {
+                        if (!cards) { cards = document.createElement('div'); cards.className = 'player-cards'; div.prepend(cards); }
+                        cards.innerHTML = renderedHand;
+                    } else cards?.remove();
+                    div.dataset.cardsKey = cardsKey;
                 }
 
                 let statusStr = '';
@@ -1105,19 +1118,19 @@
                     winBadge = `<div class="winner-badge" style="position:absolute; bottom:-20px; left:50%; transform:translateX(-50%); background:linear-gradient(45deg, #e74c3c, #c0392b); color:gold; padding:2px 8px; border-radius:5px; font-weight:900; font-size:0.8em; border:1px solid gold; z-index:30; text-shadow: 1px 1px 1px black; white-space:nowrap;">🏆 WINNER</div>`;
                 }
 
-                div.innerHTML = `
-                    ${cardsHtml}
-                    <div class="avatar-frame" style="${winnerClass}">${avatarHtml}</div>
-                    <div class="player-info-box">
+                const avatar = div.querySelector('.avatar-frame');
+                if (avatar.dataset.content !== avatarHtml) { avatar.innerHTML = avatarHtml; avatar.dataset.content = avatarHtml; }
+                if (avatar.style.cssText !== winnerClass) avatar.style.cssText = winnerClass;
+                const infoHtml = `
                         <div style="margin-bottom:2px;">${roleBadge}</div>
                         <div class="player-name">${escapeHTML(p.name)}</div>
                         ${p.bot_style ? `<div class="bot-style">${escapeHTML(p.bot_style)}</div>` : ""}
                         <div class="player-chips">$${p.chips}</div>
                         ${statusStr ? `<div class="player-status">${statusStr}</div>` : ''}
-                    </div>
-                    ${winBadge}
                 `;
-                table.appendChild(div);
+                if (div._infoHtml !== infoHtml) { div.querySelector('.player-info-box').innerHTML = infoHtml; div._infoHtml = infoHtml; }
+                if (winBadge && !div.querySelector('.winner-badge')) div.insertAdjacentHTML('beforeend', winBadge);
+                else if (!winBadge) div.querySelector('.winner-badge')?.remove();
             });
 
             // 移除原本文字版的遊戲紀錄，因為新版面較小，可以透過上方通知顯示
@@ -1226,6 +1239,7 @@
 
         window.addEventListener("DOMContentLoaded", init);
     </script>
+<script src="/review-merge.js"></script>
 <script src="/hand-cache.js"></script>
 <script src="/player-style.js"></script>
 <script src="/poker-pro.js"></script>

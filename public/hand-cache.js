@@ -1,6 +1,5 @@
 // Device-local durable reviews, partitioned by the current browser account.
 window.HandCache = (() => {
-    const HISTORY_LIMIT = 500;
     let opening;
     function open() {
         if (opening) return opening;
@@ -29,11 +28,10 @@ window.HandCache = (() => {
             const tx = db.transaction('hands', 'readwrite'), store = tx.objectStore('hands');
             const request = store.index('owner').getAll(owner);
             request.onsuccess = () => {
-                const byId = new Map(request.result.map(r=>[r.id,r.review]));
-                reviews.forEach(r=>{if(r?.id && Array.isArray(r.hand) && Array.isArray(r.actions))byId.set(r.id,r);});
-                const sorted = [...byId.values()].sort((a,b)=>b.started.localeCompare(a.started));
-                sorted.slice(0,HISTORY_LIMIT).forEach(review=>store.put({owner,id:review.id,review}));
-                sorted.slice(HISTORY_LIMIT).forEach(review=>store.delete([owner,review.id]));
+                const sorted = PokerReviewMerge(request.result.map(r=>r.review),reviews.filter(r=>r?.id&&Array.isArray(r.hand)&&Array.isArray(r.actions)));
+                const retained = new Set(sorted.map(review=>review.id));
+                sorted.forEach(review=>store.put({owner,id:review.id,review}));
+                request.result.filter(record=>!retained.has(record.id)).forEach(record=>store.delete([owner,record.id]));
             };
             tx.oncomplete = () => resolve();
             tx.onabort = tx.onerror = () => reject(tx.error || new Error('無法寫入瀏覽器儲存空間'));

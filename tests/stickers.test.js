@@ -27,18 +27,18 @@ test('fixed room stickers are broadcast with the authenticated seat identity',as
 test('expanded table phrases are configured on both client and server',()=>{
  const serverSource=fs.readFileSync(path.join(__dirname,'../app.js'),'utf8');
  const clientSource=fs.readFileSync(path.join(__dirname,'../public/table-reactions.js'),'utf8');
- for(const id of ['hurry','sleepy','one_time','thinking','lucky','close','brutal','tilt']){
+ for(const id of ['hurry','sleepy','one_time','thinking','lucky','close','brutal','tilt','monster']){
   assert.match(serverSource,new RegExp(`['"]${id}['"]`),`server: ${id}`);
   assert.match(clientSource,new RegExp(`${id}:`),`client: ${id}`);
  }
- for(const label of ['快點','要睡著了','就一次'])assert.match(clientSource,new RegExp(label));
+ for(const label of ['快點','要睡著了','就一次','我超大'])assert.match(clientSource,new RegExp(label));
 });
 
 test('a newly added table phrase is accepted and broadcast',async()=>{
  await new Promise(resolve=>setTimeout(resolve,1550));
  const received=once(viewer,'table_sticker');
- assert.equal((await emitAck(sender,'hurry')).success,true);
- assert.equal((await received).id,'hurry');
+ assert.equal((await emitAck(sender,'monster')).success,true);
+ const event=await received;assert.equal(event.id,'monster');assert.equal(event.user_id,'hero');
 });
 
 test('unknown stickers and rapid spam are rejected',async()=>{
@@ -48,4 +48,4 @@ test('unknown stickers and rapid spam are rejected',async()=>{
  assert.equal((await emitAck(sender,'wow')).success,true);
 });
 
-after(()=>{sender?.disconnect();viewer?.disconnect();game?.cancelScheduledAction();io.close();server.close();fs.rmSync(process.env.POKER_HISTORY_DIR,{recursive:true,force:true});});
+after(async()=>{sender?.disconnect();viewer?.disconnect();game?.cancelScheduledAction();io.close();server.close();await require('../hand-history').flush();fs.rmSync(process.env.POKER_HISTORY_DIR,{recursive:true,force:true});});

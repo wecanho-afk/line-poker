@@ -10,4 +10,4 @@ test('preflop raise remains Raise; first postflop wager is Bet and next increase
  assert.equal(g.playerAction(g.getCurrentPlayer().userId,'call')[0],true);assert.equal(g.gameState,'turn');assert.equal(g.currentBetAmount,0);
  assert.equal(g.playerAction(g.getCurrentPlayer().userId,'check')[0],true);const bettor=g.getCurrentPlayer();assert.equal(g.playerAction(bettor.userId,'raise',20)[0],true);assert.equal(bettor.lastAction,'bet');
 });
-after(()=>{games.forEach(g=>{g.cancelScheduledAction();clearTimeout(g.emptyTimeout);});io.close();server.close();fs.rmSync(process.env.POKER_HISTORY_DIR,{recursive:true,force:true});});
+after(async()=>{games.forEach(g=>{g.cancelScheduledAction();clearTimeout(g.emptyTimeout);});io.close();server.close();await require('../hand-history').flush();fs.rmSync(process.env.POKER_HISTORY_DIR,{recursive:true,force:true});});

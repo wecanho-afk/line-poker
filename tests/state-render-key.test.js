@@ -21,3 +21,9 @@ test('visible game changes always produce a new render key',()=>{
   state({next_hand_remaining_ms:3900}),state({slot_hand:true,slot_interval:5,slot_forced_bet:400})
  ]) assert.notEqual(stateRenderKey(original),stateRenderKey(changed));
 });
+
+test('completed strategy advice refreshes the view even when the hand ID stays the same',()=>{
+ const pending=state({completed_hand:{id:'same-hand',analysis_status:'pending'}});
+ const ready=state({completed_hand:{id:'same-hand',analysis_status:'ready'}});
+ assert.notEqual(stateRenderKey(pending),stateRenderKey(ready));
+});

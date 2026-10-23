@@ -57,4 +57,4 @@ test('socket reconnect cannot reactivate a deliberately vacated seat',async()=>{
   assert.equal((await response).game_id,g.gameId);assert.equal(g.players.a.sittingOut,true);
  }finally{client.disconnect();}
 });
-after(()=>{games.forEach(g=>{g.cancelScheduledAction();clearTimeout(g.emptyTimeout);});io.close();server.close();fs.rmSync(process.env.POKER_HISTORY_DIR,{recursive:true,force:true});});
+after(async()=>{games.forEach(g=>{g.cancelScheduledAction();clearTimeout(g.emptyTimeout);});io.close();server.close();await require('../hand-history').flush();fs.rmSync(process.env.POKER_HISTORY_DIR,{recursive:true,force:true});});

@@ -104,4 +104,4 @@ test('the lobby explains and submits the optional cash-table mode',()=>{
  assert.match(atmosphere,/state\.game_state==='slot_announcement'/);assert.match(atmosphere,/拉霸模式即將開始/);
 });
 
-after(()=>{games.forEach(g=>{g.cancelScheduledAction();clearTimeout(g.emptyTimeout);});io.close();server.close();fs.rmSync(process.env.POKER_HISTORY_DIR,{recursive:true,force:true});});
+after(async()=>{games.forEach(g=>{g.cancelScheduledAction();clearTimeout(g.emptyTimeout);});io.close();server.close();await require('../hand-history').flush();fs.rmSync(process.env.POKER_HISTORY_DIR,{recursive:true,force:true});});

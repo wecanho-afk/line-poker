@@ -12,7 +12,7 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
 const TABLE_STICKERS = new Set([
     'nice','wow','gg','laugh','cheer','thanks','coffee','fish',
-    'hurry','sleepy','one_time','thinking','lucky','close','brutal','tilt'
+    'hurry','sleepy','one_time','thinking','lucky','close','brutal','tilt','monster'
 ]);
 const STICKER_COOLDOWN_MS = 1500;
 const SHOWDOWN_REVEAL_MS = 4000;
@@ -609,7 +609,7 @@ class TexasHoldemGame {
         this.actionCount++;
         this.latestVoice = 'winner';
         this.gameState = 'showdown';
-        history.finish(this);
+        history.finish(this, () => broadcastState(this.gameId));
         
         this.scheduleAction('next', SHOWDOWN_REVEAL_MS);
         broadcastState(this.gameId);
@@ -1184,7 +1184,7 @@ class TexasHoldemGame {
         this.messages.push(`結算: ${boardMessages.join('；')}`);
 
         this.gameState = 'showdown';
-        history.finish(this);
+        history.finish(this, () => broadcastState(this.gameId));
         this.actionCount++;
         this.latestVoice = 'winner';
         

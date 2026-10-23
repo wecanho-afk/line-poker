@@ -4,10 +4,9 @@ let proState = null, proView = 'table', reviewHands = [], selectedHand = 0, sele
 let historyKey;
 const handSaveStates = new Map();
 let historyNotice = '', historyLoadVersion = 0;
-const HISTORY_LIMIT = 500;
 const cacheOwner = () => userId + ':' + historyKey;
 function mergeReviews(...groups) {
-    return [...new Map(groups.flat().map(h=>[h.id,h])).values()].sort((a,b)=>b.started.localeCompare(a.started)).slice(0,HISTORY_LIMIT);
+    return PokerReviewMerge(...groups);
 }
 function updateHandSaveStatus(state) {
     let el=document.getElementById('hand-save-status');
@@ -15,7 +14,7 @@ function updateHandSaveStatus(state) {
     const review=state.completed_hand;
     el.hidden=!review;
     if(!review)return;
-    const owner=cacheOwner(), key=owner+':'+review.id;
+    const owner=cacheOwner(), key=owner+':'+review.id+':'+(review.analysis_status||'ready');
     if(!handSaveStates.has(key)) {
         handSaveStates.set(key,'saving');
         HandCache.save(owner,[review]).then(()=>handSaveStates.set(key,'saved')).catch(()=>handSaveStates.set(key,'failed')).finally(()=>{
@@ -23,6 +22,12 @@ function updateHandSaveStatus(state) {
         });
     }
     el.textContent={saving:'正在儲存手牌…',saved:'手牌已儲存在此瀏覽器，可到「手牌回顧」檢討。',failed:'瀏覽器無法保存手牌，請允許網站儲存資料；目前仍可開啟回顧。'}[handSaveStates.get(key)];
+    if(review.analysis_status==='pending'&&handSaveStates.get(key)==='saved')el.textContent='手牌已儲存，策略建議分析中…';
+    const previous=reviewHands.find(hand=>hand.id===review.id);
+    if(proView==='history'&&previous&&previous.analysis_status!==review.analysis_status){
+        const selectedId=reviewHands[selectedHand]?.id;
+        reviewHands=mergeReviews(reviewHands,[review]);selectedHand=Math.max(0,reviewHands.findIndex(hand=>hand.id===selectedId));renderHistory();
+    }
 }
 let stateSyncTimer = null, stateSyncBusy = false;
 function startStateSync() {
@@ -138,7 +143,8 @@ async function loadHistory() {
         const response=await fetch(`${BACKEND_URL}/hand_history/${encodeURIComponent(userId)}`,{headers:{'X-History-Key':historyKey},cache:'no-store',signal:AbortSignal.timeout(8000)});
         const res=await response.json();
         if(!response.ok||!res.success)throw Error('無法讀取');
-        const merged=mergeReviews(local,pending,res.hands);
+        const latest=cacheOwner()===owner&&proState?.completed_hand?[proState.completed_hand]:[];
+        const merged=mergeReviews(local,pending,res.hands,reviewHands,latest);
         try { await HandCache.save(owner,merged); }
         catch { historyNotice='目前可檢討，但瀏覽器無法保存紀錄，請允許網站儲存資料。'; }
         if(proView!=='history'||version!==historyLoadVersion)return;
@@ -163,7 +169,8 @@ function renderStep() {
     const h=reviewHands[selectedHand], e=h.actions[selectedStep], detail=document.getElementById('review-detail');
     detail.innerHTML=`<h3>${escapeHTML(h.scenario?.title||'牌局決策回顧')}</h3><div class="muted">本手淨額 ${h.net>=0?'+':''}${h.net} · 得池者 ${escapeHTML(h.winners.join('、'))}</div><div class="review-cards">${h.hand.map(c=>formatCard(c)).join('')}</div>`;
     if(!e){detail.innerHTML+='<p>這手牌没有可回顧的主動決策。</p>';return;}
-    detail.innerHTML+=`<div class="review-actions"><button id="review-prev" ${selectedStep===0?'disabled':''} aria-label="上一步">←</button><span>${selectedStep+1} / ${h.actions.length} · ${streetLabels[e.street]}</span><button id="review-next" ${selectedStep===h.actions.length-1?'disabled':''} aria-label="下一步">→</button></div><div class="review-cards">${e.board.map(c=>formatCard(c)).join('')||'<span class="muted">尚未發出公共牌</span>'}</div><div class="review-step"><strong>${escapeHTML(e.name)} ${actionLabels[e.display_action || e.action]} ${e.action==='raise'||e.action==='call'?e.amount:''}</strong><br><span class="muted">行動前底池 ${e.pot} · 剩餘 ${e.stack} · 跟注額 ${e.call} · ${escapeHTML(e.position)}</span>${e.advice?`<div class="advice"><strong>${e.action===e.advice.action?'方向符合建議':'可檢討的決策'}：${actionLabels[e.advice.action === 'raise' && e.display_action === 'bet' ? 'bet' : e.advice.action]} ${e.advice.amount||''}</strong><p>${escapeHTML(e.advice.reason)}</p><p class="muted">${escapeHTML(e.advice.caveat)}</p>${e.action==='raise'&&e.advice.action==='raise'?'<p>同為加注仍需比較尺寸；上述金額為模型建議總額。</p>':''}</div>`:'<p class="muted">對手行動紀錄；不使用對手底牌提供分析。</p>'}</div>`;
+    const adviceNotice=e.mine?(h.analysis_status==='pending'?'策略建議分析中，完成後會自動更新。':'本次策略建議暫時無法產生，行動紀錄已保留。'):'對手行動紀錄；不使用對手底牌提供分析。';
+    detail.innerHTML+=`<div class="review-actions"><button id="review-prev" ${selectedStep===0?'disabled':''} aria-label="上一步">←</button><span>${selectedStep+1} / ${h.actions.length} · ${streetLabels[e.street]}</span><button id="review-next" ${selectedStep===h.actions.length-1?'disabled':''} aria-label="下一步">→</button></div><div class="review-cards">${e.board.map(c=>formatCard(c)).join('')||'<span class="muted">尚未發出公共牌</span>'}</div><div class="review-step"><strong>${escapeHTML(e.name)} ${actionLabels[e.display_action || e.action]} ${e.action==='raise'||e.action==='call'?e.amount:''}</strong><br><span class="muted">行動前底池 ${e.pot} · 剩餘 ${e.stack} · 跟注額 ${e.call} · ${escapeHTML(e.position)}</span>${e.advice?`<div class="advice"><strong>${e.action===e.advice.action?'方向符合建議':'可檢討的決策'}：${actionLabels[e.advice.action === 'raise' && e.display_action === 'bet' ? 'bet' : e.advice.action]} ${e.advice.amount||''}</strong><p>${escapeHTML(e.advice.reason)}</p><p class="muted">${escapeHTML(e.advice.caveat)}</p>${e.action==='raise'&&e.advice.action==='raise'?'<p>同為加注仍需比較尺寸；上述金額為模型建議總額。</p>':''}</div>`:'<p class="muted">'+adviceNotice+'</p>'}</div>`;
     document.getElementById('review-prev').onclick=()=>{selectedStep--;renderStep();};document.getElementById('review-next').onclick=()=>{selectedStep++;renderStep();};
 }
 function radarMarkup(metrics) {

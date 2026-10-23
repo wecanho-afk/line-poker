@@ -143,4 +143,4 @@ test('delayed responses and repeated snapshots cannot add thinking time', () => 
     const next=snapshot(20000,2);clock.capture(next);clock.accept(next);assert.equal(clock.remaining(),20000);
     clock.accept({...next,turn_deadline:0,turn_id:null});assert.equal(clock.remaining(),0);
 });
-after(()=>{games.forEach(g=>g.cancelScheduledAction());io.close();server.close();fs.rmSync(process.env.POKER_HISTORY_DIR,{recursive:true,force:true});});
+after(async()=>{games.forEach(g=>g.cancelScheduledAction());io.close();server.close();await require('../hand-history').flush();fs.rmSync(process.env.POKER_HISTORY_DIR,{recursive:true,force:true});});

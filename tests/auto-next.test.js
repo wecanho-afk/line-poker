@@ -38,4 +38,4 @@ test('practice waits for replay and insufficient players stop safely',()=>{
  const h=make();h.playerAction(h.getCurrentPlayer().userId,'fold');h.players.b.sittingOut=true;h.advanceDueAction(h.scheduledAction.due);
  assert.equal(h.handNumber,1);assert.equal(h.gameState,'game_over');
 });
-after(()=>{games.forEach(g=>{g.cancelScheduledAction();clearTimeout(g.emptyTimeout);});io.close();server.close();fs.rmSync(process.env.POKER_HISTORY_DIR,{recursive:true,force:true});});
+after(async()=>{games.forEach(g=>{g.cancelScheduledAction();clearTimeout(g.emptyTimeout);});io.close();server.close();await require('../hand-history').flush();fs.rmSync(process.env.POKER_HISTORY_DIR,{recursive:true,force:true});});

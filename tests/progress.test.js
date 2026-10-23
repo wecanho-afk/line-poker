@@ -41,13 +41,14 @@ test('bot strategy exceptions cannot strand a turn',()=>{
  try{g.scheduledAction.due=0;g.advanceDueAction();assert.equal(g.actionCount,2);assert.equal(g.getCurrentPlayer().userId,'hero');}
  finally{bot.decide=decide;}
 });
-test('a read-only archive still delivers an owner-only completed hand',()=>{
+test('a read-only archive still delivers an owner-only completed hand',async()=>{
  const oldDirectory=process.env.POKER_HISTORY_DIR;
  const blocked=path.join(oldDirectory,'blocked');fs.writeFileSync(blocked,'not a directory');
  process.env.POKER_HISTORY_DIR=blocked;
  try{
   const g=make('btn-open');g.players.hero.historyKey='browser-save-test';
   assert.equal(g.playerAction('hero','fold')[0],true);
+  await require('../hand-history').flush();
   assert.equal(g.historyError,true);
   const own=g.toJSON('hero').completed_hand;
   assert.ok(own?.id);assert.deepEqual(own.hand,g.players.hero.hand.map(String));
@@ -58,4 +59,4 @@ test('a read-only archive still delivers an owner-only completed hand',()=>{
   assert.ok(archived.some(h=>h.id===own.id));
  }finally{process.env.POKER_HISTORY_DIR=oldDirectory;}
 });
-after(()=>{games.forEach(g=>g.cancelScheduledAction());io.close();server.close();fs.rmSync(process.env.POKER_HISTORY_DIR,{recursive:true,force:true});});
+after(async()=>{games.forEach(g=>g.cancelScheduledAction());io.close();server.close();await require('../hand-history').flush();fs.rmSync(process.env.POKER_HISTORY_DIR,{recursive:true,force:true});});

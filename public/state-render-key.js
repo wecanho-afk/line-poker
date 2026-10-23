@@ -25,7 +25,7 @@
       Math.ceil((state.next_hand_remaining_ms || 0) / 1000), state.host_user_id,
       state.dealer_id, state.sb_id, state.bb_id, state.community_cards,
       state.runout_boards, state.runout_shared_count, state.runout_choice, state.winners,
-      state.practice, state.cash_settlement, state.completed_hand?.id || '', tournament, players
+      state.practice, state.cash_settlement, state.completed_hand?.id || '', state.completed_hand?.analysis_status || '', tournament, players
     ]);
   }
 

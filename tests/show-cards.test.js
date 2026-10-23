@@ -27,4 +27,4 @@ test('folded players may show after completion; visibility survives prepareNext 
 test('normal contested showdown still exposes eligible hands and no folded cards',()=>{
  const g=make(false);g.gameState='showdown';assert.deepEqual(hand(g),g.players.a.hand.map(String));g.players.a.folded=true;assert.deepEqual(hand(g),['??','??']);
 });
-after(()=>{games.forEach(g=>{g.cancelScheduledAction();clearTimeout(g.emptyTimeout);});io.close();server.close();fs.rmSync(process.env.POKER_HISTORY_DIR,{recursive:true,force:true});});
+after(async()=>{games.forEach(g=>{g.cancelScheduledAction();clearTimeout(g.emptyTimeout);});io.close();server.close();await require('../hand-history').flush();fs.rmSync(process.env.POKER_HISTORY_DIR,{recursive:true,force:true});});

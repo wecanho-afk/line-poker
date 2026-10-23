@@ -90,10 +90,11 @@ test('a different or missing LINE account cannot take over the seat', async () =
   } finally { global.fetch = nativeFetch; }
 });
 
-after(() => {
+after(async () => {
   global.fetch = nativeFetch;
   games.forEach(g => { g.cancelScheduledAction(); clearTimeout(g.emptyTimeout); });
   io.close(); server.close();
+  await require('../hand-history').flush();
   fs.rmSync(process.env.POKER_HISTORY_DIR, { recursive: true, force: true });
 });
 

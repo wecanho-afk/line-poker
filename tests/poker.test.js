@@ -125,4 +125,4 @@ test('seeded two, six and eight-seat bot tables complete successive hands with l
  }finally{Math.random=originalRandom;}
 });
 
-after(()=>{timers.forEach(clearTimeout);global.setTimeout=originalTimeout;io.close();server.close();fs.rmSync(process.env.POKER_HISTORY_DIR,{recursive:true,force:true});});
+after(async()=>{timers.forEach(clearTimeout);global.setTimeout=originalTimeout;io.close();server.close();await history.flush();fs.rmSync(process.env.POKER_HISTORY_DIR,{recursive:true,force:true});});

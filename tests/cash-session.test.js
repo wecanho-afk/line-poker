@@ -39,4 +39,4 @@ test('cash top-ups accumulate in total buy-in and are locked after final settlem
  assert.equal(result.status,409);assert.equal(g.players.Hero.totalBuyIn,1400);delete GAMES[g.gameId];
 });
 
-after(()=>{io.close();server.close();fs.rmSync(process.env.POKER_HISTORY_DIR,{recursive:true,force:true});});
+after(async()=>{io.close();server.close();await require('../hand-history').flush();fs.rmSync(process.env.POKER_HISTORY_DIR,{recursive:true,force:true});});
